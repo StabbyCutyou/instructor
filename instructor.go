@@ -13,35 +13,47 @@ import (
 	"github.com/tapjoy/adfilteringservice/vendor/github.com/davecgh/go-spew/spew"
 )
 
-type cache map[string]map[string]interface{}
+// Finder is a function type that is used to load an object, serialized into a struct
+// from the integrating-applications list of structs
 type Finder func(string) (interface{}, error)
+
+// Converter is a function type that is used to convert a string to an associated type
+// You'd wrap whatever logic you needed, including something like just JSON Unmarshalling
+// to turn a string representation of a value into a concrete instance of it's type.
+// Four come out of the box for you: string, bool, int, and float64
+type Converter func(string) (interface{}, error)
+
+type cache map[string]map[string]interface{}
 type finders map[string]Finder
-type converter func(string) (interface{}, error)
+type converters map[string]Converter
 
 // Version is the current semver for this tool
-const Version = "0.0.1"
-
-var converters = make(map[string]converter)
+const Version = "0.0.2"
 
 // Instructor is
 type Instructor struct {
-	cache   cache
-	finders finders
-}
-
-func init() {
-	// Seed the converters
-	converters["bool"] = stringToBool
-	converters["int"] = stringToInt
-	converters["float"] = stringToFloat64
+	cache      cache
+	finders    finders
+	converters converters
 }
 
 // New returns a new Instructor
-func New(seed finders) (*Instructor, error) {
+func New() *Instructor {
 	return &Instructor{
-		cache:   make(cache),
-		finders: seed,
-	}, nil
+		cache:      make(cache),
+		finders:    make(finders),
+		converters: map[string]Converter{"bool": stringToBool, "int": stringToInt, "float64": stringToFloat64, "string": stringToString},
+	}
+}
+
+// RegisterFinder is for registering one of your custom finders to look up your structs
+func (i *Instructor) RegisterFinder(name string, f Finder) {
+	i.finders[name] = f
+}
+
+// RegisterConverter is for registering one of your custom converters to convert cli arguments to typed values
+func (i *Instructor) RegisterConverter(name string, c Converter) {
+	i.converters[name] = c
 }
 
 // REPL will enter the read eval print loop, blocking the main thread until it exits
@@ -86,7 +98,7 @@ func (i *Instructor) REPL() error {
 					spew.Dump(obj)
 				}
 			case "call":
-				args, err = inputToArgs(parts[4:])
+				args, err = i.inputToArgs(parts[4:])
 				if err != nil {
 					fmt.Printf("Error calling %s %s %s: %s\n", parts[1], parts[2], parts[3], err.Error())
 				}
@@ -101,7 +113,7 @@ func (i *Instructor) REPL() error {
 	return nil
 }
 
-// Find will find things
+// find will find things
 func (i *Instructor) find(stype string, id string) (interface{}, error) {
 	fmt.Printf("FINDING %s %s\n", stype, id)
 	var sc map[string]interface{}
@@ -151,20 +163,20 @@ func (i *Instructor) call(stype string, id string, methodName string, args []int
 	return nil
 }
 
-func inputToArgs(input []string) ([]interface{}, error) {
+func (i *Instructor) inputToArgs(input []string) ([]interface{}, error) {
 	// Check the length, if it's lopsided it can't be right
 	if len(input)%2 != 0 {
 		return nil, errors.New("Input arguments incorrectly formatted")
 	}
 	args := make([]interface{}, 0)
 	// For every pair of inputs
-	for i := 0; i < len(input); i += 2 {
-		val := input[i]
-		t := input[i+1]
-		var c converter
+	for j := 0; j < len(input); j += 2 {
+		val := input[j]
+		t := input[j+1]
+		var c Converter
 		var ok bool
 		// Lookup our converter, error on not found
-		if c, ok = converters[t]; !ok {
+		if c, ok = i.converters[t]; !ok {
 			return nil, fmt.Errorf("No converter found for type: %s", t)
 		}
 		// Convert, error on not found
@@ -189,4 +201,8 @@ func stringToInt(s string) (interface{}, error) {
 
 func stringToFloat64(s string) (interface{}, error) {
 	return strconv.ParseFloat(s, 64)
+}
+
+func stringToString(s string) (interface{}, error) {
+	return s, nil
 }
