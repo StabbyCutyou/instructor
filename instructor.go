@@ -28,7 +28,7 @@ type finders map[string]Finder
 type converters map[string]Converter
 
 // Version is the current semver for this tool
-const Version = "0.0.2"
+const Version = "0.0.3"
 
 // Instructor is
 type Instructor struct {
