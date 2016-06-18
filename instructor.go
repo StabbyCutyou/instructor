@@ -119,9 +119,11 @@ func (i *Instructor) buildCommand(input string) (*command, error) {
 			// Trip the foundFunction gate boolean
 			foundFunction = true
 			f := strings.TrimSpace(tokenBuffer.String())
+			// If we're inside the find command, set it as the command name
 			if f == "find" {
 				cmd.commandName = f
 			} else {
+				// if we're in any other method, set it as the variable method being invoked
 				cmd.variableMethod = f
 			}
 			tokenBuffer.Reset()
@@ -240,11 +242,14 @@ func (i *Instructor) REPL() error {
 					// We're storing it by name for later lookups
 					var h heap
 					var ok bool
+					// If the heap for this type doesn't exist, make it
 					if h, ok = i.cache[stype]; !ok {
 						h = make(heap)
 						i.cache[stype] = h
 					}
+					// Set it on the heap
 					h[cmd.variableName] = obj
+					// Add a lookup of variable name to type in the instances table
 					i.instances[cmd.variableName] = stype
 				}
 			} else if cmd.variableName != "" {
@@ -281,8 +286,6 @@ func (i *Instructor) REPL() error {
 func (i *Instructor) find(stype string, id string) (interface{}, error) {
 	var obj interface{}
 	var err error
-	fmt.Printf("%s\n", stype)
-	fmt.Printf("%s\n", id)
 	f := i.finders[stype]
 	if obj, err = f(id); err != nil {
 		return nil, err
