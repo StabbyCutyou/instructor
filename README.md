@@ -1,5 +1,5 @@
 # Instructor
-[![GoDoc](http://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](http://godoc.org/github.com/StabbyCutyou/instructor) 
+[![GoDoc](http://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](http://godoc.org/github.com/StabbyCutyou/instructor)
 
 The world's crappiest joke of a REPL for golang based applications
 
@@ -66,7 +66,17 @@ have it on Github at the moment to get feedback. Proper docs are coming, but ess
 * type: `find MyStruct MyID`
 * type: `call MyStruct MyID SimpleFunc`
 * type: `call MyStruct MyID FuncWithParams 50 int true bool 1.0 float64 joejoe string`
-* So far, those are the only four param types supported. More coming.
+* So far, those are the following param types supported:
+ * int
+ * *int
+ * uint
+ * *uint
+ * float64
+ * *float64
+ * string
+ * *string
+ * bool
+ * *bool
 
 # License
 

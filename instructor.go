@@ -40,9 +40,20 @@ type Instructor struct {
 // New returns a new Instructor
 func New() *Instructor {
 	return &Instructor{
-		cache:      make(cache),
-		finders:    make(finders),
-		converters: map[string]Converter{"bool": stringToBool, "int": stringToInt, "float64": stringToFloat64, "string": stringToString},
+		cache:   make(cache),
+		finders: make(finders),
+		converters: map[string]Converter{
+			"bool":     stringToBool,
+			"*bool":    stringToBool,
+			"int":      stringToInt,
+			"*int":     stringToInt,
+			"uint":     stringToUint,
+			"*uint":    stringToPUint,
+			"float64":  stringToFloat64,
+			"*float64": stringToFloat64,
+			"string":   stringToString,
+			"*string":  stringToString,
+		},
 	}
 }
 
@@ -195,14 +206,54 @@ func stringToBool(s string) (interface{}, error) {
 	return strconv.ParseBool(s)
 }
 
+func stringToPBool(s string) (interface{}, error) {
+	b, err := strconv.ParseBool(s)
+	if err != nil {
+		return nil, err
+	}
+	return &b, nil
+}
+
 func stringToInt(s string) (interface{}, error) {
 	return strconv.Atoi(s)
+}
+
+func stringToPInt(s string) (interface{}, error) {
+	i, err := strconv.Atoi(s)
+	if err != nil {
+		return nil, err
+	}
+	return &i, nil
+}
+
+func stringToUint(s string) (interface{}, error) {
+	return strconv.ParseUint(s, 10, 64)
+}
+
+func stringToPUint(s string) (interface{}, error) {
+	i, err := strconv.ParseUint(s, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	return &i, nil
 }
 
 func stringToFloat64(s string) (interface{}, error) {
 	return strconv.ParseFloat(s, 64)
 }
 
+func stringToPFloat64(s string) (interface{}, error) {
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return nil, err
+	}
+	return &f, err
+}
+
 func stringToString(s string) (interface{}, error) {
 	return s, nil
+}
+
+func stringToPString(s string) (interface{}, error) {
+	return &s, nil
 }
