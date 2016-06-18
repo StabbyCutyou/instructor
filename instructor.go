@@ -13,11 +13,6 @@ import (
 	"github.com/tapjoy/adfilteringservice/vendor/github.com/davecgh/go-spew/spew"
 )
 
-// Current issue: Backed myself into a bit of a corner with the command builder approach
-// need a special set of handlers for how the find func differs from calling a method
-// and passing in params - find has a pair - type, id - but not the usual pair formula (value type)
-// Need to solve this
-
 // Finder is a function type that is used to load an object, serialized into a struct
 // from the integrating-applications list of structs
 type Finder func(string) (interface{}, error)
@@ -28,6 +23,7 @@ type Finder func(string) (interface{}, error)
 // Four come out of the box for you: string, bool, int, and float64
 type Converter func(string) (interface{}, error)
 
+// Internal types used to be more explicit about the purposes of these maps
 type instanceTable map[string]string
 type heap map[string]interface{}
 type cache map[string]heap
@@ -85,6 +81,13 @@ func (i *Instructor) RegisterConverter(name string, c Converter) {
 	i.converters[name] = c
 }
 
+// This approach is clearly flawed in a number of ways.
+// This was done as a proof of concept for the idea of a REPL-sidecar type
+// library, to make it so folks could inspect objects and load them from the
+// db, network, etc etc. Ideally this should probably be parsing things into units
+// of evaluation, or statements, and chaining those statements together via operators
+// with some kind of precedence that matches golangs.
+// But, you know, it is what it is right now.
 func (i *Instructor) buildCommand(input string) (*command, error) {
 	// There is 1 special function, find
 	// Everything else is done via an instance of a struct
@@ -198,6 +201,7 @@ func (i *Instructor) REPL() error {
 	fmt.Printf("Welcome to Inspector v%s\n", Version)
 	fmt.Printf("For a list of commands, type help\n")
 	for !stop {
+		fmt.Printf("instructor %s >>", Version)
 		if input, err = reader.ReadString('\n'); err != nil {
 			fmt.Printf("Error reading from STDIN: %s\n", err.Error())
 		}
@@ -211,8 +215,9 @@ func (i *Instructor) REPL() error {
 			fmt.Println("help : prints this screen")
 			fmt.Println("find : Looks up an object by it's type and ID")
 			fmt.Println("\t\tEx: u = find(User,123456789)")
-			fmt.Println("call : Calls a method on an object that has already been found in the cache. You can provide arguments by giving their type and value, in the order they're defined on the method")
+			fmt.Println("You can call methods or invoke Properties on an object. You can provide arguments by giving their type and value, in the order they're defined on the method")
 			fmt.Println("\t\tEx: u.Strawmethod(false bool,50 int)")
+			fmt.Println("\t\tEc: u.Strawproperty")
 		default:
 			var cmd *command
 			var err error
