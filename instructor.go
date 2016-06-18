@@ -3,7 +3,7 @@ package instructor
 
 import (
 	"bufio"
-	"errors"
+	"bytes"
 	"fmt"
 	"os"
 	"reflect"
@@ -12,6 +12,11 @@ import (
 
 	"github.com/tapjoy/adfilteringservice/vendor/github.com/davecgh/go-spew/spew"
 )
+
+// Current issue: Backed myself into a bit of a corner with the command builder approach
+// need a special set of handlers for how the find func differs from calling a method
+// and passing in params - find has a pair - type, id - but not the usual pair formula (value type)
+// Need to solve this
 
 // Finder is a function type that is used to load an object, serialized into a struct
 // from the integrating-applications list of structs
@@ -23,25 +28,38 @@ type Finder func(string) (interface{}, error)
 // Four come out of the box for you: string, bool, int, and float64
 type Converter func(string) (interface{}, error)
 
-type cache map[string]map[string]interface{}
+type instanceTable map[string]string
+type heap map[string]interface{}
+type cache map[string]heap
 type finders map[string]Finder
 type converters map[string]Converter
+type arguments []interface{}
 
 // Version is the current semver for this tool
 const Version = "0.0.3"
 
-// Instructor is
+// Instructor is an instance of the object which will allow you to inspect structs
 type Instructor struct {
 	cache      cache
 	finders    finders
 	converters converters
+	instances  instanceTable
+}
+
+type command struct {
+	arguments        arguments
+	commandName      string
+	variableName     string
+	variableMethod   string
+	variableProperty string
 }
 
 // New returns a new Instructor
 func New() *Instructor {
 	return &Instructor{
-		cache:   make(cache),
-		finders: make(finders),
+		cache:     make(cache),
+		finders:   make(finders),
+		instances: make(instanceTable),
 		converters: map[string]Converter{
 			"bool":     stringToBool,
 			"*bool":    stringToBool,
@@ -67,6 +85,108 @@ func (i *Instructor) RegisterConverter(name string, c Converter) {
 	i.converters[name] = c
 }
 
+func (i *Instructor) buildCommand(input string) (*command, error) {
+	// There is 1 special function, find
+	// Everything else is done via an instance of a struct
+	// find can be alone, or its result can be set to an instance of a struct
+
+	// Walk the string, rune by rune, and parse it into tokens we can handle
+	tokenBuffer := bytes.Buffer{}
+	foundFunction := false
+	cmd := command{}
+	var err error
+	for _, c := range input {
+		switch c {
+		case '=':
+			// Assignment - the left side, the current buffer, is a variable name
+			// We need to pop that off the buffer, and take the right side as what
+			// we assign to it
+
+			// Set the variable name with the current contents
+			cmd.variableName = tokenBuffer.String()
+			// Trim any whitespace
+			cmd.variableName = strings.TrimSpace(cmd.variableName)
+			// Dump the buffer to prepare for the next set of data
+			tokenBuffer.Reset()
+		case '(':
+			// Begin function params - everything until ) is a string of params for a function call
+			// The current tokenBuffer has the function name. Pop that off, save it, and begin
+			// collecting the following inputs into the token buffer
+
+			// Trip the foundFunction gate boolean
+			foundFunction = true
+			f := strings.TrimSpace(tokenBuffer.String())
+			if f == "find" {
+				cmd.commandName = f
+			} else {
+				cmd.variableMethod = f
+			}
+			tokenBuffer.Reset()
+		case ')':
+			// End function params - turn the tokenBuffer into a list of arguments
+			// This should also be the final character in the input string under the
+			// current rules, although every input string will not always have to end with a func call
+
+			// Break the args into parts
+			parts := strings.Split(tokenBuffer.String(), ",")
+
+			// Since "find" is a special function of the repl itself, let's fork here to detect
+			// if we need to parse the params one way or another
+			// TODO robustify this if we add more repl commands
+			argParser := i.inputToArgs
+			if cmd.commandName == "find" {
+				argParser = i.inputToFindArgs
+			}
+
+			// Build them up into a properly typed array of interface{}s
+			if cmd.arguments, err = argParser(parts); err != nil {
+				return nil, err
+			}
+			tokenBuffer.Reset()
+			// Reset the foundFunction gate boolean
+			foundFunction = false
+		case '.':
+			// Dot means we're trying to invoke something on a variable, unless we're in the middle of
+			// parsing function params (could be string or float), so treat this case thusly
+			if foundFunction {
+				// Straight pass through to our buffer
+				tokenBuffer.WriteRune(c)
+				continue
+			}
+			// It wasn't inside of a func call, so not args. Treat it like a method/property invocation
+			// Set the variable name with the current contents
+			cmd.variableName = tokenBuffer.String()
+			// Trim any whitespace
+			cmd.variableName = strings.TrimSpace(cmd.variableName)
+			// Dump the buffer to prepare for the next set of data
+			tokenBuffer.Reset()
+		default:
+			// Straight pass through to our buffer
+			tokenBuffer.WriteRune(c)
+		}
+	}
+
+	// Now that we're done parsing the string, there could be something left in the buffer
+	if remaining := tokenBuffer.String(); remaining != "" {
+		// If something is remaining...
+		// it is a simple call to spew a variable by name
+		// or
+		// it would be a method or property name after a dot on a variable
+		if cmd.variableName == "" {
+			// if there wasn't yet a variablename detected, we must have one now
+			cmd.variableName = tokenBuffer.String()
+		} else if cmd.arguments != nil {
+			// It was a method
+			cmd.variableMethod = tokenBuffer.String()
+		} else {
+			// it was a property
+			cmd.variableProperty = tokenBuffer.String()
+		}
+	}
+
+	return &cmd, nil
+}
+
 // REPL will enter the read eval print loop, blocking the main thread until it exits
 func (i *Instructor) REPL() error {
 	// Buffered reader off of STDIN
@@ -90,34 +210,62 @@ func (i *Instructor) REPL() error {
 			fmt.Println("quit : exits the REPL")
 			fmt.Println("help : prints this screen")
 			fmt.Println("find : Looks up an object by it's type and ID")
-			fmt.Println("\t\tEx: find User 123456789")
+			fmt.Println("\t\tEx: u = find(User,123456789)")
 			fmt.Println("call : Calls a method on an object that has already been found in the cache. You can provide arguments by giving their type and value, in the order they're defined on the method")
-			fmt.Println("\t\tEx: call User 123456789 Strawmethod false bool, 50 int")
+			fmt.Println("\t\tEx: u.Strawmethod(false bool,50 int)")
 		default:
-			parts := strings.Split(input, " ")
-			var obj interface{}
-			var args []interface{}
+			var cmd *command
 			var err error
-			switch parts[0] {
-			case "find":
-				if obj, err = i.find(parts[1], parts[2]); err != nil {
-					fmt.Println(parts)
-					fmt.Println(err)
-					fmt.Printf("Error looking up %s %s: %s\n", parts[1], parts[2], err.Error())
+			if cmd, err = i.buildCommand(input); err != nil {
+				fmt.Printf("Error building command: %s\n", err.Error())
+			}
+			var obj interface{}
+
+			if cmd.commandName == "find" {
+				stype := cmd.arguments[0].(string)
+				id := cmd.arguments[1].(string)
+				//if we're assigning it to a variable or not, we'll do the find regardless
+				if obj, err = i.find(stype, id); err != nil {
+					fmt.Printf("Error looking up %s %s: %s\n", stype, id, err.Error())
 				} else {
-					fmt.Println("lllll")
 					spew.Dump(obj)
 				}
-			case "call":
-				args, err = i.inputToArgs(parts[4:])
-				if err != nil {
-					fmt.Printf("Error calling %s %s %s: %s\n", parts[1], parts[2], parts[3], err.Error())
+
+				if cmd.variableName != "" {
+					// We're storing it by name for later lookups
+					var h heap
+					var ok bool
+					if h, ok = i.cache[stype]; !ok {
+						h = make(heap)
+						i.cache[stype] = h
+					}
+					h[cmd.variableName] = obj
+					i.instances[cmd.variableName] = stype
 				}
-				if err = i.call(parts[1], parts[2], parts[3], args); err != nil {
-					fmt.Printf("Error calling %s %s %s: %s\n", parts[1], parts[2], parts[3], err.Error())
+			} else if cmd.variableName != "" {
+				// We didn't expressly call one of the built in REPL functions, and there
+				// is a variable - so we're either trying to re-spew the variable, or call
+				// a method/property on it.
+				var obj interface{}
+				var ok bool
+				var stype string
+				// first, get which type it's in
+				if stype, ok = i.instances[cmd.variableName]; !ok {
+					fmt.Printf("Error: Unknown variable %s", cmd.variableName)
+					continue
 				}
-			default:
-				fmt.Printf("Unknown command %s\n", parts[0])
+				c := i.cache[stype]
+				obj = c[cmd.variableName]
+				if cmd.variableMethod == "" && cmd.variableProperty == "" {
+					// respew
+					spew.Dump(obj)
+				} else if cmd.variableProperty != "" {
+					// print a property
+					i.callProperty(obj, cmd.variableProperty)
+				} else {
+					// invoke a method
+					i.callMethod(obj, cmd.variableMethod, cmd.arguments)
+				}
 			}
 		}
 	}
@@ -126,37 +274,28 @@ func (i *Instructor) REPL() error {
 
 // find will find things
 func (i *Instructor) find(stype string, id string) (interface{}, error) {
-	fmt.Printf("FINDING %s %s\n", stype, id)
-	var sc map[string]interface{}
-	var ok bool
-	// Look up the cache for this type
-	if sc, ok = i.cache[stype]; !ok {
-		// If not found, make one
-		sc = make(map[string]interface{})
-		i.cache[stype] = sc
-	}
 	var obj interface{}
 	var err error
-	// Look up this object in the cache
-	if obj, ok = sc[id]; !ok {
-		// If not found, find it
-		f := i.finders[stype]
-		if obj, err = f(id); err != nil {
-			return nil, err
-		}
-		sc[id] = obj
+	fmt.Printf("%s\n", stype)
+	fmt.Printf("%s\n", id)
+	f := i.finders[stype]
+	if obj, err = f(id); err != nil {
+		return nil, err
 	}
-	// Return the object
+
 	return obj, nil
 }
 
-func (i *Instructor) call(stype string, id string, methodName string, args []interface{}) error {
-	var obj interface{}
-	var err error
-	// Get the object, either from cache or from the underlying call to look it up
-	if obj, err = i.find(stype, id); err != nil {
-		return err
-	}
+func (i *Instructor) callProperty(obj interface{}, propertyName string) error {
+	v := reflect.ValueOf(obj).Elem()
+	p := v.FieldByName(propertyName)
+	r := p.Interface()
+	// Print all the results
+	fmt.Printf("%+v\n", r)
+	return nil
+}
+
+func (i *Instructor) callMethod(obj interface{}, methodName string, args arguments) error {
 	// Get the reflect value and look up the method
 	v := reflect.ValueOf(obj)
 	m := v.MethodByName(methodName)
@@ -174,16 +313,28 @@ func (i *Instructor) call(stype string, id string, methodName string, args []int
 	return nil
 }
 
-func (i *Instructor) inputToArgs(input []string) ([]interface{}, error) {
-	// Check the length, if it's lopsided it can't be right
-	if len(input)%2 != 0 {
-		return nil, errors.New("Input arguments incorrectly formatted")
+func (i *Instructor) inputToFindArgs(input []string) (arguments, error) {
+	// This will just handle the 2 arguments find expects
+	args := make(arguments, 2)
+	if len(input) != 2 {
+		return nil, fmt.Errorf("Incorrect number of arguments passed to find: Expected 2, got %d", len(input))
 	}
-	args := make([]interface{}, 0)
+	args[0] = input[0]
+	args[1] = input[1]
+	return args, nil
+}
+
+func (i *Instructor) inputToArgs(input []string) (arguments, error) {
+	args := make(arguments, 0)
+	if len(input) == 1 && input[0] == "" {
+		// Edge case for functions parsed with no params
+		return args, nil
+	}
 	// For every pair of inputs
-	for j := 0; j < len(input); j += 2 {
-		val := input[j]
-		t := input[j+1]
+	for _, arg := range input {
+		parts := strings.Split(arg, " ")
+		val := strings.TrimSpace(parts[0])
+		t := strings.TrimSpace(parts[1])
 		var c Converter
 		var ok bool
 		// Lookup our converter, error on not found
