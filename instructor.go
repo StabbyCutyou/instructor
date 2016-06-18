@@ -261,7 +261,7 @@ func (i *Instructor) REPL() error {
 				var stype string
 				// first, get which type it's in
 				if stype, ok = i.instances[cmd.variableName]; !ok {
-					fmt.Printf("Error: Unknown variable %s", cmd.variableName)
+					fmt.Printf("Error: Unknown variable %s\n", cmd.variableName)
 					continue
 				}
 				c := i.cache[stype]
@@ -295,6 +295,12 @@ func (i *Instructor) find(stype string, id string) (interface{}, error) {
 }
 
 func (i *Instructor) callProperty(obj interface{}, propertyName string) error {
+	// No crashing!
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Printf("Recovering from panic: %s\n", err)
+		}
+	}()
 	v := reflect.ValueOf(obj).Elem()
 	p := v.FieldByName(propertyName)
 	r := p.Interface()
@@ -304,6 +310,12 @@ func (i *Instructor) callProperty(obj interface{}, propertyName string) error {
 }
 
 func (i *Instructor) callMethod(obj interface{}, methodName string, args arguments) error {
+	// No crashing!
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Printf("Recovering from panic: %s\n", err)
+		}
+	}()
 	// Get the reflect value and look up the method
 	v := reflect.ValueOf(obj)
 	m := v.MethodByName(methodName)
@@ -322,6 +334,12 @@ func (i *Instructor) callMethod(obj interface{}, methodName string, args argumen
 }
 
 func (i *Instructor) inputToFindArgs(input []string) (arguments, error) {
+	// No crashing
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Printf("Recovering from panic: %s\n", err)
+		}
+	}()
 	// This will just handle the 2 arguments find expects
 	args := make(arguments, 2)
 	if len(input) != 2 {
@@ -333,6 +351,12 @@ func (i *Instructor) inputToFindArgs(input []string) (arguments, error) {
 }
 
 func (i *Instructor) inputToArgs(input []string) (arguments, error) {
+	// No crashing
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Printf("Recovering from panic: %s\n", err)
+		}
+	}()
 	args := make(arguments, 0)
 	if len(input) == 1 && input[0] == "" {
 		// Edge case for functions parsed with no params
