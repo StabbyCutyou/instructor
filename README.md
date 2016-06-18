@@ -1,4 +1,5 @@
-# Instructor [![GoDoc](http://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)]](http://godoc.org/github.com/StabbyCutyou/instructor)
+# Instructor
+[![GoDoc](http://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](http://godoc.org/github.com/StabbyCutyou/instructor) 
 
 The world's crappiest joke of a REPL for golang based applications
 
