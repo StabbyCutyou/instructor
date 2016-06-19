@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"reflect"
-	"strconv"
 	"strings"
 
 	"github.com/tapjoy/adfilteringservice/vendor/github.com/davecgh/go-spew/spew"
@@ -106,9 +105,8 @@ func (i *Instructor) buildCommand(input string) (*command, error) {
 			// we assign to it
 
 			// Set the variable name with the current contents
-			cmd.variableName = tokenBuffer.String()
 			// Trim any whitespace
-			cmd.variableName = strings.TrimSpace(cmd.variableName)
+			cmd.variableName = strings.TrimSpace(tokenBuffer.String())
 			// Dump the buffer to prepare for the next set of data
 			tokenBuffer.Reset()
 		case '(':
@@ -160,9 +158,8 @@ func (i *Instructor) buildCommand(input string) (*command, error) {
 			}
 			// It wasn't inside of a func call, so not args. Treat it like a method/property invocation
 			// Set the variable name with the current contents
-			cmd.variableName = tokenBuffer.String()
 			// Trim any whitespace
-			cmd.variableName = strings.TrimSpace(cmd.variableName)
+			cmd.variableName = strings.TrimSpace(tokenBuffer.String())
 			// Dump the buffer to prepare for the next set of data
 			tokenBuffer.Reset()
 		default:
@@ -179,13 +176,13 @@ func (i *Instructor) buildCommand(input string) (*command, error) {
 		// it would be a method or property name after a dot on a variable
 		if cmd.variableName == "" {
 			// if there wasn't yet a variablename detected, we must have one now
-			cmd.variableName = tokenBuffer.String()
+			cmd.variableName = remaining
 		} else if cmd.arguments != nil {
 			// It was a method
-			cmd.variableMethod = tokenBuffer.String()
+			cmd.variableMethod = remaining
 		} else {
 			// it was a property
-			cmd.variableProperty = tokenBuffer.String()
+			cmd.variableProperty = remaining
 		}
 	}
 
@@ -362,7 +359,7 @@ func (i *Instructor) inputToArgs(input []string) (arguments, error) {
 		// Edge case for functions parsed with no params
 		return args, nil
 	}
-	// For every pair of inputs
+	// For every input
 	for _, arg := range input {
 		parts := strings.Split(arg, " ")
 		val := strings.TrimSpace(parts[0])
@@ -382,61 +379,4 @@ func (i *Instructor) inputToArgs(input []string) (arguments, error) {
 		args = append(args, iv)
 	}
 	return args, nil
-}
-
-// All converter functions down here
-func stringToBool(s string) (interface{}, error) {
-	return strconv.ParseBool(s)
-}
-
-func stringToPBool(s string) (interface{}, error) {
-	b, err := strconv.ParseBool(s)
-	if err != nil {
-		return nil, err
-	}
-	return &b, nil
-}
-
-func stringToInt(s string) (interface{}, error) {
-	return strconv.Atoi(s)
-}
-
-func stringToPInt(s string) (interface{}, error) {
-	i, err := strconv.Atoi(s)
-	if err != nil {
-		return nil, err
-	}
-	return &i, nil
-}
-
-func stringToUint(s string) (interface{}, error) {
-	return strconv.ParseUint(s, 10, 64)
-}
-
-func stringToPUint(s string) (interface{}, error) {
-	i, err := strconv.ParseUint(s, 10, 64)
-	if err != nil {
-		return nil, err
-	}
-	return &i, nil
-}
-
-func stringToFloat64(s string) (interface{}, error) {
-	return strconv.ParseFloat(s, 64)
-}
-
-func stringToPFloat64(s string) (interface{}, error) {
-	f, err := strconv.ParseFloat(s, 64)
-	if err != nil {
-		return nil, err
-	}
-	return &f, err
-}
-
-func stringToString(s string) (interface{}, error) {
-	return s, nil
-}
-
-func stringToPString(s string) (interface{}, error) {
-	return &s, nil
 }
