@@ -180,9 +180,7 @@ func (i *Interpreter) callMethodChain(chain []fragment, args []fragment) error {
 	// Call the Method with the value args
 	r := m.Call(vArgs)
 	// Print all the results
-	for _, rv := range r {
-		fmt.Printf("%+v\n", rv)
-	}
+	spew.Dump(r)
 	return nil
 }
 
