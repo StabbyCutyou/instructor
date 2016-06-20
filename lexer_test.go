@@ -14,7 +14,7 @@ type LexerTestCase struct {
 
 var cases = []LexerTestCase{
 	{
-		statement: "o = find(testRecord,smedley)",
+		statement: "o = find(testRecord,\"smedley@gmail.com\")",
 		results: []Token{
 			WORD, WS, ASSIGN, WS, FIND, LPAREN, WORD, COMMA, WORD, RPAREN, EOF,
 		},
@@ -23,6 +23,12 @@ var cases = []LexerTestCase{
 		statement: "o",
 		results: []Token{
 			WORD, EOF,
+		},
+	},
+	{
+		statement: "o.CreatedDate",
+		results: []Token{
+			WORD, PERIOD, WORD, EOF,
 		},
 	},
 	//{
@@ -41,13 +47,15 @@ var cases = []LexerTestCase{
 }
 
 type testRecord struct {
-	createdDate time.Time
-	email       string
-	orderIDs    []int
+	CreatedDate time.Time
+	Email       string
+	OrderIDs    []int
 }
 
+func (t *testRecord) Stuff() {}
+
 var testCache = map[string]testRecord{
-	"smedley": {email: "smedley@mail.com", createdDate: time.Now(), orderIDs: []int{1, 3, 4}},
+	"smedley@gmail.com": {Email: "smedley@mail.com", CreatedDate: time.Now(), OrderIDs: []int{1, 3, 4}},
 }
 
 func lookup(email string) (interface{}, error) {
@@ -61,6 +69,7 @@ func TestLexerCases(t *testing.T) {
 	i := NewInterpreter()
 	i.RegisterFinder("testRecord", lookup)
 	for _, c := range cases {
+		fmt.Println("-----")
 		r := strings.NewReader(c.statement)
 		p := newLexer(r)
 

@@ -8,6 +8,10 @@ import (
 	"github.com/tapjoy/adfilteringservice/vendor/github.com/davecgh/go-spew/spew"
 )
 
+// Current task - property 1 deep works, maybe N deep? need test
+// need to test method calls, 1 and N deep.
+// After that... code cleanup
+
 // Interpreter is
 type Interpreter struct {
 	cache      cache
@@ -47,21 +51,32 @@ func (i *Interpreter) Evaluate(statement []fragment) error {
 	statement = cleanWhitespace(statement)
 	firstFragment := statement[0]
 	if firstFragment.token == FIND {
+		// Pass from the 4th token on (LPAREN <-> RPAREN : EOF))
+		// get back arguments for dynamic finder
+		stype, id, err := statementToFindArgs(statement[1:])
+		if err != nil {
+			return err
+		}
+		obj, err := i.find(stype, id)
+		spew.Dump(obj)
 
 	} else if firstFragment.token == WORD {
 		// This could be either:
-		// assigning an operation to a variable
-		// calling a variable (spew results)
+		// xassigning an operation to a variable
+		// xcalling a variable (spew results)
 		// calling a method on a variable
 		// calling a property on a variable
-		if len(statement) == 1 {
+		if statement[1].token == EOF && len(statement) == 2 {
 			// They called a variable - display it
 			// TODO if keywords other than find exist, this needs rethought
-			i.printVariable(statement)
-		}
-		if statement[1].token == ASSIGN && len(statement) > 3 {
-			//x = find(model, 123)
+			if err := i.printVariable(statement); err != nil {
+				return err
+			}
+		} else if statement[1].token == ASSIGN && len(statement) > 3 {
+			// This means we're doing an assignment.
+			// Could be from a find call, or a property/method call
 			if statement[2].token == FIND {
+				//x = find(model, 123)
 				// Pass from the 4th token on (LPAREN <-> RPAREN : EOF))
 				// get back arguments for dynamic finder
 				stype, id, err := statementToFindArgs(statement[3:])
@@ -72,19 +87,139 @@ func (i *Interpreter) Evaluate(statement []fragment) error {
 				if err != nil {
 					return err
 				}
-				if err := i.storeInHeap(id, obj); err != nil {
+				// Store it on the heap with the variable name, ie the first fragments text
+				if err := i.storeInHeap(firstFragment.text, obj); err != nil {
 					return err
 				}
 				spew.Dump(obj)
+			} else if statement[2].token == WORD && statement[3].token == PERIOD {
+				// we've got something like x = y. - we're going to chain down a series of calls
 			}
 		} else if statement[1].token == PERIOD {
-			//x.Method() or x.Property
+			//x.Method() or x.Property, or a chain of them
+			// First, we need to break the statement into pieces:
+			// if it's a property call, then we're fine
+			// if it's a method call, we need the chain, then the arguments
+			chain, args := statementToInvocationChainAndParams(statement)
+			if args == nil {
+				// It's a property invocation
+				// The first word in the statement is the variable
+				// the next N are the property chains
+				if err := i.callPropertyChain(chain); err != nil {
+					return err
+				}
+			} else {
+				// It's a method invocation
+				// The first word in the statement is the variable
+				// the next N are the property chains
+				// the args are the things to invoke on the method
+				if err := i.callMethodChain(chain, args); err != nil {
+					return err
+				}
+			}
 		}
 	} else {
 		return fmt.Errorf("Error: %s is not a valid token at position 0", statement[0])
 	}
 
 	return nil
+}
+
+func (i *Interpreter) callMethodChain(chain []fragment, args []fragment) error {
+	// No crashing!
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Printf("Recovering from panic: %s\n", err)
+		}
+	}()
+	inputArgs, err := i.statementToArgs(args)
+	if err != nil {
+		return err
+	}
+	max := len(chain)
+	// Get the object to call the method on
+	// if max-1 is the last element, and that is the funcion,
+	// then mex-2 is the depth of the property chain
+	obj, err := i.crawlPropertyChain(chain[1 : max-2])
+	if err != nil {
+		return err
+	}
+	// Get the reflect value and look up the method
+	v := reflect.ValueOf(obj)
+	m := v.MethodByName(chain[max-1].text)
+	// Make a method of params to pass into the Method
+	vArgs := make([]reflect.Value, len(inputArgs))
+	for i, arg := range inputArgs {
+		vArgs[i] = reflect.ValueOf(arg)
+	}
+	// Call the Method with the value args
+	r := m.Call(vArgs)
+	// Print all the results
+	for _, rv := range r {
+		fmt.Printf("%+v\n", rv)
+	}
+	return nil
+}
+
+func (i *Interpreter) crawlPropertyChain(statement []fragment) (interface{}, error) {
+	// No crashing!
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Printf("Recovering from panic xxx: %s\n", err)
+		}
+	}()
+	stype, ok := i.instances[statement[0].text]
+	if !ok {
+		return nil, fmt.Errorf("Error: Unknown variable %s", statement[0].text)
+	}
+	h, ok := i.cache[stype]
+	if !ok {
+		return nil, fmt.Errorf("Error: Unknown variable %s", statement[0].text)
+	}
+	obj, ok := h[statement[0].text]
+	if !ok {
+		return nil, fmt.Errorf("Error: Unknown variable %s", statement[0].text)
+	}
+	currentVal := reflect.ValueOf(obj)
+
+	for i, f := range statement[1:] {
+		if f.token != EOF {
+			p := currentVal.FieldByName(f.text)
+			currentVal = p
+		}
+	}
+
+	return currentVal.Interface(), nil
+}
+
+func (i *Interpreter) callPropertyChain(statement []fragment) error {
+	obj, err := i.crawlPropertyChain(statement)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("%+v\n", obj)
+	return nil
+}
+
+func statementToInvocationChainAndParams(statement []fragment) ([]fragment, []fragment) {
+	chain := make([]fragment, 0)
+	args := make([]fragment, 0)
+	hitParen := false
+	for _, f := range statement {
+		if !hitParen && f.token != PERIOD {
+			// We're still in the chain
+			chain = append(chain, f)
+		} else if f.token == LPAREN {
+			hitParen = true
+		} else if hitParen {
+			// We're in the method params
+			args = append(args, f)
+		}
+	}
+	if hitParen {
+		return chain, args
+	}
+	return chain, nil
 }
 
 func statementToFindArgs(statement []fragment) (string, string, error) {
@@ -123,7 +258,7 @@ func (i *Interpreter) RegisterConverter(name string, c Converter) {
 func (i *Interpreter) storeInHeap(id string, obj interface{}) error {
 	// Get the type as a string
 	t := reflect.TypeOf(obj)
-	stype := t.String()
+	stype := strings.Split(t.String(), ".")[1]
 	// Store record in i.instances
 	i.instances[id] = stype
 	// Get it's heap from cache
@@ -161,31 +296,18 @@ func (i *Interpreter) printVariable(statement []fragment) error {
 	return nil
 }
 
-// find will find things
+// find will find things. It is basically a replacement, all purpose object constructor/retriever
 func (i *Interpreter) find(stype string, id string) (interface{}, error) {
 	var obj interface{}
 	var err error
 	f := i.finders[stype]
+	if f == nil {
+		return nil, fmt.Errorf("No lookup method found for type %s", stype)
+	}
 	if obj, err = f(id); err != nil {
 		return nil, err
 	}
-
 	return obj, nil
-}
-
-func (i *Interpreter) callProperty(obj interface{}, propertyName string) error {
-	// No crashing!
-	defer func() {
-		if err := recover(); err != nil {
-			fmt.Printf("Recovering from panic: %s\n", err)
-		}
-	}()
-	v := reflect.ValueOf(obj).Elem()
-	p := v.FieldByName(propertyName)
-	r := p.Interface()
-	// Print all the results
-	fmt.Printf("%+v\n", r)
-	return nil
 }
 
 func (i *Interpreter) callMethod(obj interface{}, methodName string, args arguments) error {
@@ -212,24 +334,7 @@ func (i *Interpreter) callMethod(obj interface{}, methodName string, args argume
 	return nil
 }
 
-func (i *Interpreter) inputToFindArgs(input []string) (arguments, error) {
-	// No crashing
-	defer func() {
-		if err := recover(); err != nil {
-			fmt.Printf("Recovering from panic: %s\n", err)
-		}
-	}()
-	// This will just handle the 2 arguments find expects
-	args := make(arguments, 2)
-	if len(input) != 2 {
-		return nil, fmt.Errorf("Incorrect number of arguments passed to find: Expected 2, got %d", len(input))
-	}
-	args[0] = input[0]
-	args[1] = input[1]
-	return args, nil
-}
-
-func (i *Interpreter) inputToArgs(input []string) (arguments, error) {
+func (i *Interpreter) statementToArgs(statement []fragment) (arguments, error) {
 	// No crashing
 	defer func() {
 		if err := recover(); err != nil {
@@ -237,28 +342,44 @@ func (i *Interpreter) inputToArgs(input []string) (arguments, error) {
 		}
 	}()
 	args := make(arguments, 0)
-	if len(input) == 1 && input[0] == "" {
-		// Edge case for functions parsed with no params
+	// statement should be of the format LPAREN [WORD WORD COMMA] ... RPAREN EOF
+	max := len(statement)
+	if max == 3 {
+		// method with no params, return early
 		return args, nil
 	}
-	// For every input
-	for _, arg := range input {
-		parts := strings.Split(arg, " ")
-		val := strings.TrimSpace(parts[0])
-		t := strings.TrimSpace(parts[1])
-		var c Converter
-		var ok bool
-		// Lookup our converter, error on not found
-		if c, ok = i.converters[t]; !ok {
-			return nil, fmt.Errorf("No converter found for type: %s", t)
+	j := 1
+	currentfrag := statement[j] // skip the first paren
+	currentval := ""
+	currenttype := ""
+	// TODO this feels like a super hacky way to do this. Improve it?
+	for currentfrag.token != EOF {
+		if currentfrag.token == WORD {
+			if currentval == "" {
+				currentval = currentfrag.text
+			} else if currenttype == "" {
+				currenttype = currentfrag.text
+			}
+		} else if currentfrag.token == COMMA || currentfrag.token == RPAREN {
+			// hit a comma, reset
+			var c Converter
+			var ok bool
+			if c, ok = i.converters[currenttype]; !ok {
+				return nil, fmt.Errorf("No converter found for type: %s", currenttype)
+			}
+			// Convert, error on not found
+			iv, err := c(currentval)
+			if err != nil {
+				return nil, fmt.Errorf("Error converting %s %s: %s", currentval, currenttype, err.Error())
+			}
+			// Add to the our list to return
+			args = append(args, iv)
+			currentval = ""
+			currenttype = ""
 		}
-		// Convert, error on not found
-		iv, err := c(val)
-		if err != nil {
-			return nil, fmt.Errorf("Error converting %s %s: %s", val, t, err.Error())
-		}
-		// Add to the our list to return
-		args = append(args, iv)
+
+		j++
+		currentfrag = statement[j]
 	}
 	return args, nil
 }
