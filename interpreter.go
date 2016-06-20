@@ -129,7 +129,7 @@ func (i *Interpreter) callMethodChain(chain []fragment, args []fragment) error {
 	// No crashing!
 	defer func() {
 		if err := recover(); err != nil {
-			fmt.Printf("Recovering from panicxxx: %s\n", err)
+			fmt.Printf("Recovering from panic: %s\n", err)
 		}
 	}()
 	var err error
