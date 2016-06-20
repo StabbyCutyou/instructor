@@ -8,7 +8,7 @@ import (
 	"github.com/tapjoy/adfilteringservice/vendor/github.com/davecgh/go-spew/spew"
 )
 
-// Current task - property 1 deep works, maybe N deep? need test
+// Current task
 // need to test method calls, 1 and N deep.
 // After that... code cleanup
 
@@ -129,9 +129,10 @@ func (i *Interpreter) callMethodChain(chain []fragment, args []fragment) error {
 	// No crashing!
 	defer func() {
 		if err := recover(); err != nil {
-			fmt.Printf("Recovering from panic: %s\n", err)
+			fmt.Printf("Recovering from panicxxx: %s\n", err)
 		}
 	}()
+	var err error
 	inputArgs, err := i.statementToArgs(args)
 	if err != nil {
 		return err
@@ -139,19 +140,43 @@ func (i *Interpreter) callMethodChain(chain []fragment, args []fragment) error {
 	max := len(chain)
 	// Get the object to call the method on
 	// if max-1 is the last element, and that is the funcion,
-	// then mex-2 is the depth of the property chain
-	obj, err := i.crawlPropertyChain(chain[1 : max-2])
-	if err != nil {
-		return err
+	var obj interface{}
+	if max > 2 {
+		// if max > 2, then the chain needs to be evaluated to get the object
+		// to call the method on. Otherwise, the 2nd fragment is the method, and
+		// it's called directly
+		obj, err = i.crawlPropertyChain(chain[:max-1])
+		if err != nil {
+			return err
+		}
+	} else {
+		stype, ok := i.instances[chain[0].text]
+		if !ok {
+			return fmt.Errorf("Error: Unknown variable %s", chain[0].text)
+		}
+		heap, ok := i.cache[stype]
+		if !ok {
+			return fmt.Errorf("Error: Unknown variable %s", chain[0].text)
+		}
+		obj, ok = heap[chain[0].text]
+		if !ok {
+			return fmt.Errorf("Error: Unknown variable %s", chain[0].text)
+		}
 	}
+
 	// Get the reflect value and look up the method
 	v := reflect.ValueOf(obj)
+	// Don't do this for methods.. but perhaps we need a ptr/nonptr fallback?
+	//if v.Kind() == reflect.Ptr {
+	//	v = v.Elem()
+	//}
 	m := v.MethodByName(chain[max-1].text)
 	// Make a method of params to pass into the Method
 	vArgs := make([]reflect.Value, len(inputArgs))
 	for i, arg := range inputArgs {
 		vArgs[i] = reflect.ValueOf(arg)
 	}
+
 	// Call the Method with the value args
 	r := m.Call(vArgs)
 	// Print all the results
@@ -165,7 +190,7 @@ func (i *Interpreter) crawlPropertyChain(statement []fragment) (interface{}, err
 	// No crashing!
 	defer func() {
 		if err := recover(); err != nil {
-			fmt.Printf("Recovering from panic xxx: %s\n", err)
+			fmt.Printf("Recovering from panic: %s\n", err)
 		}
 	}()
 	stype, ok := i.instances[statement[0].text]
@@ -182,8 +207,12 @@ func (i *Interpreter) crawlPropertyChain(statement []fragment) (interface{}, err
 	}
 	currentVal := reflect.ValueOf(obj)
 
-	for i, f := range statement[1:] {
+	for _, f := range statement[1:] {
 		if f.token != EOF {
+			// Deref if we're dealing with a pointer
+			if currentVal.Kind() == reflect.Ptr {
+				currentVal = currentVal.Elem()
+			}
 			p := currentVal.FieldByName(f.text)
 			currentVal = p
 		}
@@ -206,11 +235,12 @@ func statementToInvocationChainAndParams(statement []fragment) ([]fragment, []fr
 	args := make([]fragment, 0)
 	hitParen := false
 	for _, f := range statement {
-		if !hitParen && f.token != PERIOD {
+		if f.token == LPAREN {
+			hitParen = true
+			args = append(args, f)
+		} else if !hitParen && f.token != PERIOD {
 			// We're still in the chain
 			chain = append(chain, f)
-		} else if f.token == LPAREN {
-			hitParen = true
 		} else if hitParen {
 			// We're in the method params
 			args = append(args, f)

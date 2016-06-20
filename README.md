@@ -32,6 +32,10 @@ I sure don't! Part of the fun was trying to make it work.
 
 See previous answer
 
+# Any roadmap?
+* Lots of code cleanup and improvements
+* Find a better solution than my hackneyed "find" method for seeding objects into the environment.
+
 # How do I integrate it into my app?
 
 Currently, the recommended way to integrate into an existing app is create a sub-binary

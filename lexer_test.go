@@ -26,9 +26,33 @@ var cases = []LexerTestCase{
 		},
 	},
 	{
-		statement: "o.CreatedDate",
+		statement: "o.Dumb.Yes",
 		results: []Token{
-			WORD, PERIOD, WORD, EOF,
+			WORD, PERIOD, WORD, PERIOD, WORD, EOF,
+		},
+	},
+	{
+		statement: "o.Stuff()",
+		results: []Token{
+			WORD, PERIOD, WORD, LPAREN, RPAREN, EOF,
+		},
+	},
+	{
+		statement: "o.Stuff2(false bool, 50 int)",
+		results: []Token{
+			WORD, PERIOD, WORD, LPAREN, WORD, WS, WORD, COMMA, WS, WORD, WS, WORD, RPAREN, EOF,
+		},
+	},
+	{
+		statement: "o.Dumb.DeepStuff()",
+		results: []Token{
+			WORD, PERIOD, WORD, PERIOD, WORD, LPAREN, RPAREN, EOF,
+		},
+	},
+	{
+		statement: "o.Dumb.DeepStuff2(true bool, 50 int)",
+		results: []Token{
+			WORD, PERIOD, WORD, PERIOD, WORD, LPAREN, WORD, WS, WORD, COMMA, WS, WORD, WS, WORD, RPAREN, EOF,
 		},
 	},
 	//{
@@ -50,12 +74,37 @@ type testRecord struct {
 	CreatedDate time.Time
 	Email       string
 	OrderIDs    []int
+	Dumb        nestedProperty
 }
 
-func (t *testRecord) Stuff() {}
+type nestedProperty struct {
+	Yes bool
+}
 
-var testCache = map[string]testRecord{
-	"smedley@gmail.com": {Email: "smedley@mail.com", CreatedDate: time.Now(), OrderIDs: []int{1, 3, 4}},
+func (n nestedProperty) DeepStuff() int {
+	return 30056
+}
+
+func (n nestedProperty) DeepStuff2(a bool, b int) int {
+	if a {
+		return 30056 + b
+	}
+	return b
+}
+
+func (t *testRecord) Stuff() int {
+	return 500001
+}
+
+func (t *testRecord) Stuff2(a bool, b int) int {
+	if a {
+		return 500001 + b
+	}
+	return b
+}
+
+var testCache = map[string]*testRecord{
+	"smedley@gmail.com": {Email: "smedley@mail.com", CreatedDate: time.Now(), OrderIDs: []int{1, 3, 4}, Dumb: nestedProperty{Yes: true}},
 }
 
 func lookup(email string) (interface{}, error) {
@@ -86,6 +135,9 @@ func TestLexerCases(t *testing.T) {
 			k++
 		}
 
-		fmt.Println(i.Evaluate(statement))
+		if err := i.Evaluate(statement); err != nil {
+			fmt.Println(err)
+			t.Fail()
+		}
 	}
 }
