@@ -57,3 +57,12 @@ func stringToString(s string) (interface{}, error) {
 func stringToPString(s string) (interface{}, error) {
 	return &s, nil
 }
+
+func stringToRune(s string) (interface{}, error) {
+	return rune(s[0]), nil
+}
+
+func stringToPRune(s string) (interface{}, error) {
+	r := rune(s[0])
+	return &r, nil
+}
