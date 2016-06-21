@@ -27,7 +27,7 @@ type converters map[string]Converter
 type arguments []interface{}
 
 // Version is the current semver for this tool
-const Version = "0.1.0"
+const Version = "0.1.1"
 
 // Instructor is an instance of the object which will allow you to inspect structs
 type Instructor struct {
