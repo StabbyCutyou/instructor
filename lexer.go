@@ -49,11 +49,6 @@ type lexer struct {
 	b tokenBuffer
 }
 
-type fragment struct {
-	token Token
-	text  string
-}
-
 // newScanner returns a new instance of the Lexical Scanner
 func newScanner(r io.Reader) *scanner {
 	return &scanner{

@@ -8,11 +8,8 @@ import (
 	"github.com/tapjoy/adfilteringservice/vendor/github.com/davecgh/go-spew/spew"
 )
 
-// Current task
-// need to test method calls, 1 and N deep.
-// After that... code cleanup
-
-// Interpreter is
+// interpreter is a quasi-runtime that holds objects in memory, knows how to find and convert things
+// and interprets statements
 type interpreter struct {
 	finders    finders
 	converters converters
@@ -45,7 +42,7 @@ func newInterpreter() *interpreter {
 // This method is becoming a hard to maintain mess
 // Consider: breaking the method up into something that determines what "type"
 // of statement it is, and simplify the forking logic?
-func (i *interpreter) Evaluate(statement []fragment) error {
+func (i *interpreter) Evaluate(statement statement) error {
 	// First thing, lets just make sure no pesky whitespace is hanging around
 	// As a quick cheat, because it's possible, and this is why i'm starting to hate find...
 	// We'll check for it first as a special case, and send it down the rabbit hole
@@ -154,7 +151,7 @@ func (i *interpreter) Evaluate(statement []fragment) error {
 	return nil
 }
 
-func (i *interpreter) callMethodChain(chain []fragment, args []fragment) ([]interface{}, error) {
+func (i *interpreter) callMethodChain(chain statement, args statement) ([]interface{}, error) {
 	// No crashing!
 	defer func() {
 		if err := recover(); err != nil {
@@ -208,7 +205,7 @@ func (i *interpreter) callMethodChain(chain []fragment, args []fragment) ([]inte
 	return results, nil
 }
 
-func (i *interpreter) crawlPropertyChain(statement []fragment) (interface{}, error) {
+func (i *interpreter) crawlPropertyChain(statement statement) (interface{}, error) {
 	// No crashing!
 	defer func() {
 		if err := recover(); err != nil {
@@ -235,7 +232,7 @@ func (i *interpreter) crawlPropertyChain(statement []fragment) (interface{}, err
 	return currentVal.Interface(), nil
 }
 
-func (i *interpreter) callPropertyChain(statement []fragment) (interface{}, error) {
+func (i *interpreter) callPropertyChain(statement statement) (interface{}, error) {
 	obj, err := i.crawlPropertyChain(statement)
 	if err != nil {
 		return nil, err
@@ -244,11 +241,11 @@ func (i *interpreter) callPropertyChain(statement []fragment) (interface{}, erro
 	return obj, nil
 }
 
-func statementToInvocationChainAndParams(statement []fragment) ([]fragment, []fragment) {
-	chain := make([]fragment, 0)
-	args := make([]fragment, 0)
+func statementToInvocationChainAndParams(s statement) (statement, statement) {
+	chain := make(statement, 0)
+	args := make(statement, 0)
 	hitParen := false
-	for _, f := range statement {
+	for _, f := range s {
 		if f.token == LPAREN {
 			hitParen = true
 			args = append(args, f)
@@ -266,22 +263,22 @@ func statementToInvocationChainAndParams(statement []fragment) ([]fragment, []fr
 	return chain, nil
 }
 
-func statementToFindArgs(statement []fragment) (string, string, error) {
-	max := len(statement)
+func statementToFindArgs(s statement) (string, string, error) {
+	max := len(s)
 	if max == 6 && // Find statement should only have 7 fragements
-		statement[0].token == LPAREN &&
-		statement[max-1].token == EOF &&
-		statement[max-2].token == RPAREN {
+		s[0].token == LPAREN &&
+		s[max-1].token == EOF &&
+		s[max-2].token == RPAREN {
 		// Valid set of args so far
-		return statement[1].text, statement[3].text, nil
+		return s[1].text, s[3].text, nil
 	}
 	// TODO re-assemble statement for error message
 	return "", "", fmt.Errorf("Error: Invalid set of arguments for Find")
 }
 
-func cleanWhitespace(frags []fragment) []fragment {
-	results := make([]fragment, 0)
-	for _, f := range frags {
+func cleanWhitespace(s statement) statement {
+	results := make(statement, 0)
+	for _, f := range s {
 		if f.token != WS {
 			results = append(results, f)
 		}
@@ -306,8 +303,8 @@ func (i *interpreter) storeInHeap(id string, obj interface{}) error {
 	return nil
 }
 
-func (i *interpreter) printVariable(statement []fragment) error {
-	f := statement[0]
+func (i *interpreter) printVariable(s statement) error {
+	f := s[0]
 	obj, ok := i.heap[f.text]
 	if !ok {
 		return fmt.Errorf("Error: %s is not a known variable", f.text)
@@ -355,7 +352,7 @@ func (i *interpreter) callMethod(obj interface{}, methodName string, args []refl
 	return nil
 }
 
-func (i *interpreter) statementToArgs(mtype reflect.Type, statement []fragment) ([]reflect.Value, error) {
+func (i *interpreter) statementToArgs(mtype reflect.Type, s statement) ([]reflect.Value, error) {
 	// No crashing
 	defer func() {
 		if err := recover(); err != nil {
@@ -364,14 +361,14 @@ func (i *interpreter) statementToArgs(mtype reflect.Type, statement []fragment) 
 	}()
 	args := make([]reflect.Value, 0)
 	// statement should be of the format LPAREN [WORD WORD COMMA] ... RPAREN EOF
-	max := len(statement)
+	max := len(s)
 	if max == 3 {
 		// method with no params, return early
 		return args, nil
 	}
 	wordCount := 0
 	// TODO this feels like a super hacky way to do this. Improve it?
-	for _, currentfrag := range statement {
+	for _, currentfrag := range s {
 		if currentfrag.token == WORD {
 			// hit a comma, reset
 			// Get the type of the argument

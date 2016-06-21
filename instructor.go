@@ -22,9 +22,14 @@ type Converter func(string) (interface{}, error)
 type heap map[string]interface{}
 type finders map[string]Finder
 type converters map[string]Converter
+type fragment struct {
+	token Token
+	text  string
+}
+type statement []fragment
 
 // Version is the current semver for this tool
-const Version = "0.1.3"
+const Version = "0.1.4"
 
 // Instructor is an instance of the object which will allow you to inspect structs
 type Instructor struct {
@@ -79,13 +84,12 @@ func (i *Instructor) REPL() error {
 		default:
 			l := newLexer(strings.NewReader(input))
 			var f fragment
-			statement := make([]fragment, 0)
+			s := make(statement, 0)
 			for f.token != EOF {
 				f = l.scan()
-				statement = append(statement, f)
+				s = append(s, f)
 			}
-			i.interpreter.Evaluate(statement)
-
+			i.interpreter.Evaluate(s)
 		}
 	}
 	return nil
