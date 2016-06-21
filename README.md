@@ -114,7 +114,7 @@ things like the following:
 
 * type: `quit` to exit
 * type: `help` to get a list of commands
-* type: `o = find(MyStruct, MyID)`
+* type: `o = find(MyStruct, "MyID")`
   * To use the find helper, you'll need to use RegisterFinder, as demonstrated in the sample code above
 * type: `o.Property`
 * type: `o.SimpleFunc()`
