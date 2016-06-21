@@ -89,6 +89,7 @@ func (i *Instructor) REPL() error {
 				f = l.scan()
 				s = append(s, f)
 			}
+			// TODO just lass the lexer straight into evaluate
 			i.interpreter.Evaluate(s)
 		}
 	}
