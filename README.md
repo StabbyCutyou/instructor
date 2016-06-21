@@ -24,6 +24,9 @@ Well, that's a real shame. Cus this isn't meant to be fast. It certainly isn't "
 the code right now is a proof of concept and is likely to change and be unstable. It's also
 not my current focus to be super performant, but rather to refine the approach and add features.
 
+Instructor makes heavy use of `interface{}` and the `reflect` package, so there will
+always be some performance hit in general for the things it's doing.
+
 I'm not against performance improvements, they just aren't my focus at the moment.
 
 # Wow, looking at the code, it is clear you have no idea how to write an interpreter
