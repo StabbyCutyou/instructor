@@ -1,47 +1,65 @@
 # Instructor
 [![GoDoc](http://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](http://godoc.org/github.com/StabbyCutyou/instructor)
 
-The world's crappiest joke of a "REPL" for golang based applications
+It's like `rails c` for go applications, except not nearly as good
 
 # What is it?
 
-It's a way to build a sidecar binary that you can configure with database access,
-for example, and create a "REPL" that lets you interact with data, inspecting
-structs, and calling basic functions / properties on them.
+It's a way to build a sidecar binary that you can configure with access to objects
+in your applications or services. This includes loading data from a database or another
+remote location, and invoking methods and properties on those objects interactively.
 
 If what you want to is to glue together a little bootstrap code, so you can hop into a REPL-like environment and inspect data in your go app via structs, methods, and properties, Instructor might be for you.
 
-# Wait, this isn't actually a REPL
+# What isn't it?
+
+It's not a full fledged go environment - there are many things you cannot do. Even
+basic things, like declaring new instances in a "normal" way, or basic addition,
+or even declaring pointers!
+
+While all that sounds limiting, and it is, there are ways to use Instructor and
+account for those issues as well, albeit with some upfront work via configuration.
+
+Additionally, as I encounter more use cases, I focus on them for development. So
+the list of features it doesn't support is essentially the set of features that
+weren't immediately pressing while developing it
+
+# Wait, so this isn't actually a REPL?
 
 Nah, it isn't.
 
 It's more of a sidecar utility you can bolt on to an existing application, and use
-to do some basic interactions with your applications data in a REPL-like environment.
+to do some basic interactions with your applications data in an interactive environment.
+
+Kind of like a REPL. But I actually called Instructor that, i'd be rightfully torn to pieces.
 
 # Yea, but how fast is it? I'm *very* particular about code that doesn't perform well
 
 Well, that's a real shame. Cus this isn't meant to be fast. It certainly isn't "slow", but
-the code right now is a proof of concept and is likely to change and be unstable. It's also
-not my current focus to be super performant, but rather to refine the approach and add features.
+the code is likely to change wildly at any time, so until I'm happy with an approach, my
+intention is to focus more on features, and move to any performance issues once the internals
+are stable.
 
 Instructor makes heavy use of `interface{}` and the `reflect` package, so there will
-always be some performance hit in general for the things it's doing.
+generally be some unavoidable performance hit at scale for the things it does.
 
-I'm not against performance improvements, they just aren't my focus at the moment.
+But ideally, the primary use case of someone looking to use Instructor is for convenience,
+not performance.
 
 # Wow, looking at the code, it is clear you have no idea how to write an interpreter
 
 I sure don't! Part of the fun was trying to make it work.
 
-# Why didn't you...
+# Why not use yacc / bison / etc?
 
-See previous answer
+It's more fun to learn this way
 
 # Any roadmap?
 * Lots of code cleanup and improvements
 * Find a better solution than my hackneyed "find" method for seeding objects into the environment. Ideally, you could just "make"/"do" whatever you want, but that's pie in the sky stuff.
 * Variable substitution when calling methods
 * Array/Slice indexing
+* Setting Properties on objects
 
 # How do I integrate it into my app?
 
