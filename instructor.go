@@ -29,7 +29,7 @@ type fragment struct {
 type statement []fragment
 
 // Version is the current semver for this tool
-const Version = "0.1.4"
+const Version = "0.1.5"
 
 // Instructor is an instance of the object which will allow you to inspect structs
 type Instructor struct {
