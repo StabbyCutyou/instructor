@@ -131,6 +131,6 @@ things like the following:
   * In the example above, you could pass a "Flooper" to a method by using the following string
   * `{"floops": 5}`
   * See lexer_test.go for an example
-# License
 
+# License
 Apache v2 - See LICENSE
