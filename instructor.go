@@ -75,9 +75,9 @@ func (i *Instructor) REPL() error {
 			fmt.Println("quit : exits the REPL")
 			fmt.Println("help : prints this screen")
 			fmt.Println("find : Looks up an object by it's type and ID")
-			fmt.Println("\t\tEx: u = find(User,123456789)")
+			fmt.Println("\t\tEx: u = find(User,\"123456789\")")
 			fmt.Println("You can call methods or invoke Properties on an object. You can provide arguments by giving their type and value, in the order they're defined on the method")
-			fmt.Println("\t\tEx: u.Strawmethod(false bool,50 int)")
+			fmt.Println("\t\tEx: u.Strawmethod(false ,50)")
 			fmt.Println("\t\tEc: u.Strawproperty")
 		default:
 			l := newLexer(strings.NewReader(input))

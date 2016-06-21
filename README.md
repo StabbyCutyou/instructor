@@ -97,18 +97,15 @@ things like the following:
   * To use the find helper, you'll need to use RegisterFinder, as demonstrated in the sample code above
 * type: `o.Property`
 * type: `o.SimpleFunc()`
-* type: `o.ComplexFunc(50 int, true bool)`
+* type: `o.ComplexFunc(50, true)`
 * So far, those are the following param types supported:
  * int
- * *int
  * uint
- * *uint
  * float64
- * *float64
  * string
- * *string
+ * rune
  * bool
- * *bool
+ * Pointer types of the above are technically supported, you can't make literals of them yet - this is coming shortly
 
 # License
 
