@@ -24,7 +24,7 @@ type finders map[string]Finder
 type converters map[string]Converter
 
 // Version is the current semver for this tool
-const Version = "0.1.2"
+const Version = "0.1.3"
 
 // Instructor is an instance of the object which will allow you to inspect structs
 type Instructor struct {

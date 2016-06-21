@@ -42,6 +42,9 @@ func newInterpreter() *interpreter {
 // Evaluate is a set of rules dictating how the tokens will be interpreted.
 // based on each token, starting with the first, it will walk down a decision
 // tree to determine what to do next
+// This method is becoming a hard to maintain mess
+// Consider: breaking the method up into something that determines what "type"
+// of statement it is, and simplify the forking logic?
 func (i *interpreter) Evaluate(statement []fragment) error {
 	// First thing, lets just make sure no pesky whitespace is hanging around
 	// As a quick cheat, because it's possible, and this is why i'm starting to hate find...
@@ -64,7 +67,7 @@ func (i *interpreter) Evaluate(statement []fragment) error {
 		// xcalling a variable (spew results)
 		// calling a method on a variable
 		// calling a property on a variable
-		if statement[1].token == EOF && len(statement) == 2 {
+		if statement[1].token == EOF {
 			// They called a variable - display it
 			// TODO if keywords other than find exist, this needs rethought
 			if err := i.printVariable(statement); err != nil {
@@ -90,8 +93,36 @@ func (i *interpreter) Evaluate(statement []fragment) error {
 					return err
 				}
 				spew.Dump(obj)
-			} else if statement[2].token == WORD && statement[3].token == PERIOD {
-				// we've got something like x = y. - we're going to chain down a series of calls
+			} else if statement[2].token == WORD {
+				// something like x = y so far...
+				if statement[3].token == PERIOD {
+					// we've got something like x = y. - we're going to chain down a series of calls
+					// we need to traverse the call stack to get the object to assign to x
+					var obj interface{}
+					var err error
+					chain, args := statementToInvocationChainAndParams(statement)
+
+					if statement[len(statement)-2].token == RPAREN { // If the next to last is a RPAREN, meaning it's a function call
+						obj, err = i.callMethodChain(chain[2:], args)
+					} else {
+						// else, it's a normal property
+						obj, err = i.callPropertyChain(chain[2:])
+					}
+					if err != nil {
+						return err
+					}
+					// Now, assign it to the id on the left
+					i.storeInHeap(statement[0].text, obj)
+
+				} else {
+					// We've got a simple one, like x = y, where y is a variable or literal
+					obj, ok := i.heap[statement[2].text]
+					if !ok {
+						return fmt.Errorf("Error: unknown variable %s", statement[0].text)
+					}
+					i.storeInHeap(statement[0].text, obj)
+					spew.Dump(obj)
+				}
 			}
 		} else if statement[1].token == PERIOD {
 			//x.Method() or x.Property, or a chain of them
@@ -103,7 +134,7 @@ func (i *interpreter) Evaluate(statement []fragment) error {
 				// It's a property invocation
 				// The first word in the statement is the variable
 				// the next N are the property chains
-				if err := i.callPropertyChain(chain); err != nil {
+				if _, err := i.callPropertyChain(chain); err != nil {
 					return err
 				}
 			} else {
@@ -111,7 +142,7 @@ func (i *interpreter) Evaluate(statement []fragment) error {
 				// The first word in the statement is the variable
 				// the next N are the property chains
 				// the args are the things to invoke on the method
-				if err := i.callMethodChain(chain, args); err != nil {
+				if _, err := i.callMethodChain(chain, args); err != nil {
 					return err
 				}
 			}
@@ -123,7 +154,7 @@ func (i *interpreter) Evaluate(statement []fragment) error {
 	return nil
 }
 
-func (i *interpreter) callMethodChain(chain []fragment, args []fragment) error {
+func (i *interpreter) callMethodChain(chain []fragment, args []fragment) ([]interface{}, error) {
 	// No crashing!
 	defer func() {
 		if err := recover(); err != nil {
@@ -142,12 +173,12 @@ func (i *interpreter) callMethodChain(chain []fragment, args []fragment) error {
 		// it's called directly
 		obj, err = i.crawlPropertyChain(chain[:max-1])
 		if err != nil {
-			return err
+			return nil, err
 		}
 	} else {
 		obj, ok = i.heap[chain[0].text]
 		if !ok {
-			return fmt.Errorf("Error: Unknown variable %s", chain[0].text)
+			return nil, fmt.Errorf("Error: Unknown variable %s", chain[0].text)
 		}
 	}
 
@@ -163,16 +194,18 @@ func (i *interpreter) callMethodChain(chain []fragment, args []fragment) error {
 
 	inputArgs, err := i.statementToArgs(mtype, args)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Call the Method with the value args
 	r := m.Call(inputArgs)
+	results := make([]interface{}, len(r))
 	// Print all the results
 	for i, rv := range r {
 		fmt.Printf("%s[%d] : %v\n", mname, i, rv)
+		results[i] = rv.Interface()
 	}
-	return nil
+	return results, nil
 }
 
 func (i *interpreter) crawlPropertyChain(statement []fragment) (interface{}, error) {
@@ -189,7 +222,7 @@ func (i *interpreter) crawlPropertyChain(statement []fragment) (interface{}, err
 	currentVal := reflect.ValueOf(obj)
 
 	for _, f := range statement[1:] {
-		if f.token != EOF {
+		if f.token != EOF && f.token != PERIOD {
 			// Deref if we're dealing with a pointer
 			if currentVal.Kind() == reflect.Ptr {
 				currentVal = currentVal.Elem()
@@ -202,13 +235,13 @@ func (i *interpreter) crawlPropertyChain(statement []fragment) (interface{}, err
 	return currentVal.Interface(), nil
 }
 
-func (i *interpreter) callPropertyChain(statement []fragment) error {
+func (i *interpreter) callPropertyChain(statement []fragment) (interface{}, error) {
 	obj, err := i.crawlPropertyChain(statement)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	fmt.Printf("%+v\n", obj)
-	return nil
+	return obj, nil
 }
 
 func statementToInvocationChainAndParams(statement []fragment) ([]fragment, []fragment) {
