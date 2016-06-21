@@ -19,15 +19,12 @@ type Finder func(string) (interface{}, error)
 type Converter func(string) (interface{}, error)
 
 // Internal types used to be more explicit about the purposes of these maps
-type instanceTable map[string]string
 type heap map[string]interface{}
-type cache map[string]heap
 type finders map[string]Finder
 type converters map[string]Converter
-type arguments []interface{}
 
 // Version is the current semver for this tool
-const Version = "0.1.1"
+const Version = "0.1.2"
 
 // Instructor is an instance of the object which will allow you to inspect structs
 type Instructor struct {
