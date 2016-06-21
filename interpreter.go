@@ -341,30 +341,6 @@ func (i *interpreter) find(stype string, id string) (interface{}, error) {
 	return obj, nil
 }
 
-func (i *interpreter) callMethod(obj interface{}, methodName string, args []reflect.Value) error {
-	// No crashing!
-	defer func() {
-		if err := recover(); err != nil {
-			fmt.Printf("Recovering from panic: %s\n", err)
-		}
-	}()
-	// Get the reflect value and look up the method
-	v := reflect.ValueOf(obj)
-	m := v.MethodByName(methodName)
-	// Make a method of params to pass into the Method
-	vArgs := make([]reflect.Value, len(args))
-	for i, arg := range args {
-		vArgs[i] = reflect.ValueOf(arg)
-	}
-	// Call the Method with the value args
-	r := m.Call(vArgs)
-	// Print all the results
-	for _, rv := range r {
-		fmt.Printf("%+v\n", rv)
-	}
-	return nil
-}
-
 func (i *interpreter) statementToArgs(mtype reflect.Type, s statement) ([]reflect.Value, error) {
 	// No crashing
 	defer func() {
