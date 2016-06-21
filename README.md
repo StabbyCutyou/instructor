@@ -37,6 +37,8 @@ See previous answer
 # Any roadmap?
 * Lots of code cleanup and improvements
 * Find a better solution than my hackneyed "find" method for seeding objects into the environment. Ideally, you could just "make"/"do" whatever you want, but that's pie in the sky stuff.
+* Variable substitution when calling methods
+* Array/Slice indexing
 
 # How do I integrate it into my app?
 
@@ -59,6 +61,10 @@ import (
 
 var structFinder services.MyStructService
 
+type Flooper struct {
+  floops int
+}
+
 func main() {
   // Configure access to your database
   // ...
@@ -69,6 +75,7 @@ func main() {
   i := instructor.New()
   // Register a lookup method for MyStructs
   i.RegisterFinder("MyStruct", findMyStruct)
+  i.RegisterConverter("Flooper", convertFloopers)
 
   // This will block until done
   if err := i.REPL(); err != nil {
@@ -82,6 +89,17 @@ func findMyStruct(string id)(interface{}, error) {
     return structFinder.Find(id)
   }
   return nil, err
+}
+
+func convertFloopers(string s) (interface{}) {
+  b := []byte(s)
+  f := Flooper{}
+  if err := json.Unmarshal(b, &f); err != nil {
+    fmt.Println(s)
+    fmt.Println(err)
+    return f, err
+  }
+  return f, nil
 }
 ```
 
@@ -105,8 +123,11 @@ things like the following:
  * string
  * rune
  * bool
- * Pointer types of the above are technically supported, you can't make literals of them yet - this is coming shortly
-
+ * Pointer types of the above are technically supported, but you can't make literals of them yet - this is coming shortly
+ * Additionally, you can define a "Custom Converter" for any type you want, so long as you can find a way to marshall it from string.
+  * In the example above, you could pass a "Flooper" to a method by using the following string
+  * `{"floops": 5}`
+  * See lexer_test.go for an example
 # License
 
 Apache v2 - See LICENSE

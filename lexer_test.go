@@ -1,6 +1,7 @@
 package instructor
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -55,6 +56,12 @@ var cases = []LexerTestCase{
 			WORD, PERIOD, WORD, PERIOD, WORD, LPAREN, WORD, COMMA, WS, WORD, RPAREN, EOF,
 		},
 	},
+	{
+		statement: "o.Dumb.DeepStuff3(`{\"floops\":5}`)",
+		results: []Token{
+			WORD, PERIOD, WORD, PERIOD, WORD, LPAREN, WORD, RPAREN, EOF,
+		},
+	},
 }
 
 type testRecord struct {
@@ -68,6 +75,10 @@ type nestedProperty struct {
 	Yes bool
 }
 
+type Flooper struct {
+	Floops int `json:"floops"`
+}
+
 func (n nestedProperty) DeepStuff() int {
 	return 30056
 }
@@ -79,6 +90,10 @@ func (n nestedProperty) DeepStuff2(a bool, b int) int {
 	return b
 }
 
+func (n nestedProperty) DeepStuff3(f Flooper) int {
+	return f.Floops
+}
+
 func (t *testRecord) Stuff() int {
 	return 500001
 }
@@ -88,6 +103,17 @@ func (t *testRecord) Stuff2(a bool, b int) int {
 		return 500001 + b
 	}
 	return b
+}
+
+func convertFloop(s string) (interface{}, error) {
+	b := []byte(s)
+	f := Flooper{}
+	if err := json.Unmarshal(b, &f); err != nil {
+		fmt.Println(s)
+		fmt.Println(err)
+		return f, err
+	}
+	return f, nil
 }
 
 var testCache = map[string]*testRecord{
@@ -104,6 +130,7 @@ func lookup(email string) (interface{}, error) {
 func TestLexerCases(t *testing.T) {
 	i := newInterpreter()
 	i.RegisterFinder("testRecord", lookup)
+	i.RegisterConverter("Flooper", convertFloop)
 	for _, c := range cases {
 		fmt.Println("-----")
 		r := strings.NewReader(c.statement)

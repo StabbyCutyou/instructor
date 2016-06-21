@@ -25,6 +25,7 @@ const (
 	RPAREN               // 9: )
 	WORD                 // 10: anything that isn't a reserved word / token, like properties, function names, variables, or even literals like literal value, like 5, 50.0, or "joseph"
 	FIND                 // 11: built in helper for locating structs, hacky
+	TICK                 // 12: `
 )
 
 const eof = rune(0)
@@ -102,7 +103,12 @@ func (s *scanner) Scan() fragment {
 	} else if c == '"' {
 		// Scan a string which means not ignoring whitespace, until the closing quote
 		// We expressly do not unread the double quote beginning the string, and we expressly chuck the double quote closing it
-		return s.scanString()
+		return s.scanString('"')
+	} else if c == '`' {
+		// Scan a string which means not ignoring whitespace, until the closing tick
+		// We expressly do not unread the tick beginning the string, and we expressly chuck the tick closing it
+		// this case is mostly to support idiomatic entry of json
+		return s.scanString('`')
 	} else if c == '\'' {
 		// Scan a rune which means until the closing quote
 		// We expressly do not unread the single quote beginning the string, and we expressly chuck the single quote closing it
@@ -170,7 +176,7 @@ func (s *scanner) scanNumber() fragment {
 	return fragment{token: WORD, text: b.String()}
 }
 
-func (s *scanner) scanString() fragment {
+func (s *scanner) scanString(boundaryRune rune) fragment {
 	// Buffer for the current character
 	b := bytes.Buffer{}
 	b.WriteRune(s.read())
@@ -178,7 +184,7 @@ func (s *scanner) scanString() fragment {
 	for {
 		if c := s.read(); c == eof {
 			break
-		} else if c == '"' { // Break once we encounter a closing quote
+		} else if c == boundaryRune { // Break once we encounter a closing quote or tick
 			// We are going to chuck the closing quote, so we expressly do not rewind
 			break
 		} else {
