@@ -166,7 +166,8 @@ func (i *interpreter) callMethodChain(chain []fragment, args []fragment) error {
 	//if v.Kind() == reflect.Ptr {
 	//	v = v.Elem()
 	//}
-	m := v.MethodByName(chain[max-1].text)
+	mname := chain[max-1].text
+	m := v.MethodByName(mname)
 	mtype := m.Type()
 
 	inputArgs, err := i.statementToArgs(mtype, args)
@@ -177,7 +178,9 @@ func (i *interpreter) callMethodChain(chain []fragment, args []fragment) error {
 	// Call the Method with the value args
 	r := m.Call(inputArgs)
 	// Print all the results
-	spew.Dump(r)
+	for i, rv := range r {
+		fmt.Printf("%s[%d] : %v\n", mname, i, rv)
+	}
 	return nil
 }
 
