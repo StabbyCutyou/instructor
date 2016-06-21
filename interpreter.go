@@ -14,18 +14,16 @@ import (
 
 // Interpreter is
 type interpreter struct {
-	cache      cache
 	finders    finders
 	converters converters
-	instances  instanceTable
+	heap       heap
 }
 
 // newInterpreter returns a new Instructor
 func newInterpreter() *interpreter {
 	return &interpreter{
-		cache:     make(cache),
-		finders:   make(finders),
-		instances: make(instanceTable),
+		finders: make(finders),
+		heap:    make(heap),
 		converters: map[string]Converter{
 			"bool":     stringToBool,
 			"*bool":    stringToBool,
@@ -137,6 +135,7 @@ func (i *interpreter) callMethodChain(chain []fragment, args []fragment) error {
 	// Get the object to call the method on
 	// if max-1 is the last element, and that is the funcion,
 	var obj interface{}
+	var ok bool
 	if max > 2 {
 		// if max > 2, then the chain needs to be evaluated to get the object
 		// to call the method on. Otherwise, the 2nd fragment is the method, and
@@ -146,15 +145,7 @@ func (i *interpreter) callMethodChain(chain []fragment, args []fragment) error {
 			return err
 		}
 	} else {
-		stype, ok := i.instances[chain[0].text]
-		if !ok {
-			return fmt.Errorf("Error: Unknown variable %s", chain[0].text)
-		}
-		heap, ok := i.cache[stype]
-		if !ok {
-			return fmt.Errorf("Error: Unknown variable %s", chain[0].text)
-		}
-		obj, ok = heap[chain[0].text]
+		obj, ok = i.heap[chain[0].text]
 		if !ok {
 			return fmt.Errorf("Error: Unknown variable %s", chain[0].text)
 		}
@@ -191,15 +182,7 @@ func (i *interpreter) crawlPropertyChain(statement []fragment) (interface{}, err
 			fmt.Printf("Recovering from panic: %s\n", err)
 		}
 	}()
-	stype, ok := i.instances[statement[0].text]
-	if !ok {
-		return nil, fmt.Errorf("Error: Unknown variable %s", statement[0].text)
-	}
-	h, ok := i.cache[stype]
-	if !ok {
-		return nil, fmt.Errorf("Error: Unknown variable %s", statement[0].text)
-	}
-	obj, ok := h[statement[0].text]
+	obj, ok := i.heap[statement[0].text]
 	if !ok {
 		return nil, fmt.Errorf("Error: Unknown variable %s", statement[0].text)
 	}
@@ -284,42 +267,19 @@ func (i *interpreter) RegisterConverter(name string, c Converter) {
 }
 
 func (i *interpreter) storeInHeap(id string, obj interface{}) error {
-	// Get the type as a string
-	t := reflect.TypeOf(obj)
-	stype := strings.Split(t.String(), ".")[1]
 	// Store record in i.instances
-	i.instances[id] = stype
-	// Get it's heap from cache
-	h, ok := i.cache[stype]
-	if !ok {
-		// if none, make it
-		h = make(heap)
-		i.cache[stype] = h
-	}
-	// store obj by id.
-	h[id] = obj
-	// TODO is any of this necessary? Couldn't I just store instances in a hash
-	// without the indirection of the current type based heap cache lookup? Seems
-	// overdone. The way it is, I could eventually do something type-specific with it
-	// I suppose... but will / can i?
+	i.heap[id] = obj
 
 	return nil
 }
 
 func (i *interpreter) printVariable(statement []fragment) error {
 	f := statement[0]
-	stype, ok := i.instances[f.text]
+	obj, ok := i.heap[f.text]
 	if !ok {
 		return fmt.Errorf("Error: %s is not a known variable", f.text)
 	}
-	h, ok := i.cache[stype]
-	if !ok {
-		return fmt.Errorf("Error: %s is not a known variable", f.text)
-	}
-	obj, ok := h[f.text]
-	if !ok {
-		return fmt.Errorf("Error: %s is not a known variable", f.text)
-	}
+
 	spew.Dump(obj)
 	return nil
 }
