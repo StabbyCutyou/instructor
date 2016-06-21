@@ -3,6 +3,7 @@ package instructor
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -62,12 +63,18 @@ var cases = []LexerTestCase{
 			WORD, PERIOD, WORD, PERIOD, WORD, LPAREN, WORD, RPAREN, EOF,
 		},
 	},
+	{
+		statement: "o.Orders[1].CustomID(true)",
+		results: []Token{
+			WORD, PERIOD, WORD, LBRACK, WORD, RBRACK, PERIOD, WORD, LPAREN, WORD, RPAREN, EOF,
+		},
+	},
 }
 
 type testRecord struct {
 	CreatedDate time.Time
 	Email       string
-	OrderIDs    []int
+	Orders      []*Order
 	Dumb        nestedProperty
 }
 
@@ -77,6 +84,18 @@ type nestedProperty struct {
 
 type Flooper struct {
 	Floops int `json:"floops"`
+}
+
+type Order struct {
+	ID        string
+	NumFloops int
+}
+
+func (o *Order) CustomID(addfloops bool) string {
+	if addfloops {
+		return "onum-" + o.ID + "-" + strconv.Itoa(o.NumFloops)
+	}
+	return "onum-" + o.ID
 }
 
 func (n nestedProperty) DeepStuff() int {
@@ -117,7 +136,7 @@ func convertFloop(s string) (interface{}, error) {
 }
 
 var testCache = map[string]*testRecord{
-	"smedley@gmail.com": {Email: "smedley@mail.com", CreatedDate: time.Now(), OrderIDs: []int{1, 3, 4}, Dumb: nestedProperty{Yes: true}},
+	"smedley@gmail.com": {Email: "smedley@mail.com", CreatedDate: time.Now(), Orders: []*Order{{ID: "xxx", NumFloops: 10}, {ID: "rrr", NumFloops: 5}, {ID: "yyy", NumFloops: 15}}, Dumb: nestedProperty{Yes: true}},
 }
 
 func lookup(email string) (interface{}, error) {
