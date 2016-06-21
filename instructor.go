@@ -31,13 +31,13 @@ const Version = "0.1.0"
 
 // Instructor is an instance of the object which will allow you to inspect structs
 type Instructor struct {
-	interpreter *Interpreter
+	interpreter *interpreter
 }
 
 // New returns a new Instructor
 func New() *Instructor {
 	return &Instructor{
-		interpreter: NewInterpreter(),
+		interpreter: newInterpreter(),
 	}
 }
 

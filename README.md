@@ -9,6 +9,8 @@ It's a way to build a sidecar binary that you can configure with database access
 for example, and create a "REPL" that lets you interact with data, inspecting
 structs, and calling basic functions / properties on them.
 
+If what you want to is to glue together a little bootstrap code, so you can hop into a REPL-like environment and inspect data in your go app via structs, methods, and properties, Instructor might be for you.
+
 # Wait, this isn't actually a REPL
 
 Nah, it isn't.
@@ -34,7 +36,7 @@ See previous answer
 
 # Any roadmap?
 * Lots of code cleanup and improvements
-* Find a better solution than my hackneyed "find" method for seeding objects into the environment.
+* Find a better solution than my hackneyed "find" method for seeding objects into the environment. Ideally, you could just "make"/"do" whatever you want, but that's pie in the sky stuff.
 
 # How do I integrate it into my app?
 

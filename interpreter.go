@@ -13,16 +13,16 @@ import (
 // After that... code cleanup
 
 // Interpreter is
-type Interpreter struct {
+type interpreter struct {
 	cache      cache
 	finders    finders
 	converters converters
 	instances  instanceTable
 }
 
-// NewInterpreter returns a new Instructor
-func NewInterpreter() *Interpreter {
-	return &Interpreter{
+// newInterpreter returns a new Instructor
+func newInterpreter() *interpreter {
+	return &interpreter{
 		cache:     make(cache),
 		finders:   make(finders),
 		instances: make(instanceTable),
@@ -44,7 +44,7 @@ func NewInterpreter() *Interpreter {
 // Evaluate is a set of rules dictating how the tokens will be interpreted.
 // based on each token, starting with the first, it will walk down a decision
 // tree to determine what to do next
-func (i *Interpreter) Evaluate(statement []fragment) error {
+func (i *interpreter) Evaluate(statement []fragment) error {
 	// First thing, lets just make sure no pesky whitespace is hanging around
 	// As a quick cheat, because it's possible, and this is why i'm starting to hate find...
 	// We'll check for it first as a special case, and send it down the rabbit hole
@@ -125,7 +125,7 @@ func (i *Interpreter) Evaluate(statement []fragment) error {
 	return nil
 }
 
-func (i *Interpreter) callMethodChain(chain []fragment, args []fragment) error {
+func (i *interpreter) callMethodChain(chain []fragment, args []fragment) error {
 	// No crashing!
 	defer func() {
 		if err := recover(); err != nil {
@@ -133,10 +133,6 @@ func (i *Interpreter) callMethodChain(chain []fragment, args []fragment) error {
 		}
 	}()
 	var err error
-	inputArgs, err := i.statementToArgs(args)
-	if err != nil {
-		return err
-	}
 	max := len(chain)
 	// Get the object to call the method on
 	// if max-1 is the last element, and that is the funcion,
@@ -171,20 +167,21 @@ func (i *Interpreter) callMethodChain(chain []fragment, args []fragment) error {
 	//	v = v.Elem()
 	//}
 	m := v.MethodByName(chain[max-1].text)
-	// Make a method of params to pass into the Method
-	vArgs := make([]reflect.Value, len(inputArgs))
-	for i, arg := range inputArgs {
-		vArgs[i] = reflect.ValueOf(arg)
+	mtype := m.Type()
+
+	inputArgs, err := i.statementToArgs(mtype, args)
+	if err != nil {
+		return err
 	}
 
 	// Call the Method with the value args
-	r := m.Call(vArgs)
+	r := m.Call(inputArgs)
 	// Print all the results
 	spew.Dump(r)
 	return nil
 }
 
-func (i *Interpreter) crawlPropertyChain(statement []fragment) (interface{}, error) {
+func (i *interpreter) crawlPropertyChain(statement []fragment) (interface{}, error) {
 	// No crashing!
 	defer func() {
 		if err := recover(); err != nil {
@@ -219,7 +216,7 @@ func (i *Interpreter) crawlPropertyChain(statement []fragment) (interface{}, err
 	return currentVal.Interface(), nil
 }
 
-func (i *Interpreter) callPropertyChain(statement []fragment) error {
+func (i *interpreter) callPropertyChain(statement []fragment) error {
 	obj, err := i.crawlPropertyChain(statement)
 	if err != nil {
 		return err
@@ -274,16 +271,16 @@ func cleanWhitespace(frags []fragment) []fragment {
 }
 
 // RegisterFinder is for registering one of your custom finders to look up your structs
-func (i *Interpreter) RegisterFinder(name string, f Finder) {
+func (i *interpreter) RegisterFinder(name string, f Finder) {
 	i.finders[name] = f
 }
 
 // RegisterConverter is for registering one of your custom converters to convert cli arguments to typed values
-func (i *Interpreter) RegisterConverter(name string, c Converter) {
+func (i *interpreter) RegisterConverter(name string, c Converter) {
 	i.converters[name] = c
 }
 
-func (i *Interpreter) storeInHeap(id string, obj interface{}) error {
+func (i *interpreter) storeInHeap(id string, obj interface{}) error {
 	// Get the type as a string
 	t := reflect.TypeOf(obj)
 	stype := strings.Split(t.String(), ".")[1]
@@ -306,7 +303,7 @@ func (i *Interpreter) storeInHeap(id string, obj interface{}) error {
 	return nil
 }
 
-func (i *Interpreter) printVariable(statement []fragment) error {
+func (i *interpreter) printVariable(statement []fragment) error {
 	f := statement[0]
 	stype, ok := i.instances[f.text]
 	if !ok {
@@ -325,7 +322,7 @@ func (i *Interpreter) printVariable(statement []fragment) error {
 }
 
 // find will find things. It is basically a replacement, all purpose object constructor/retriever
-func (i *Interpreter) find(stype string, id string) (interface{}, error) {
+func (i *interpreter) find(stype string, id string) (interface{}, error) {
 	var obj interface{}
 	var err error
 	f := i.finders[stype]
@@ -338,7 +335,7 @@ func (i *Interpreter) find(stype string, id string) (interface{}, error) {
 	return obj, nil
 }
 
-func (i *Interpreter) callMethod(obj interface{}, methodName string, args arguments) error {
+func (i *interpreter) callMethod(obj interface{}, methodName string, args []reflect.Value) error {
 	// No crashing!
 	defer func() {
 		if err := recover(); err != nil {
@@ -362,52 +359,42 @@ func (i *Interpreter) callMethod(obj interface{}, methodName string, args argume
 	return nil
 }
 
-func (i *Interpreter) statementToArgs(statement []fragment) (arguments, error) {
+func (i *interpreter) statementToArgs(mtype reflect.Type, statement []fragment) ([]reflect.Value, error) {
 	// No crashing
 	defer func() {
 		if err := recover(); err != nil {
 			fmt.Printf("Recovering from panic: %s\n", err)
 		}
 	}()
-	args := make(arguments, 0)
+	args := make([]reflect.Value, 0)
 	// statement should be of the format LPAREN [WORD WORD COMMA] ... RPAREN EOF
 	max := len(statement)
 	if max == 3 {
 		// method with no params, return early
 		return args, nil
 	}
-	j := 1
-	currentfrag := statement[j] // skip the first paren
-	currentval := ""
-	currenttype := ""
+	wordCount := 0
 	// TODO this feels like a super hacky way to do this. Improve it?
-	for currentfrag.token != EOF {
+	for _, currentfrag := range statement {
 		if currentfrag.token == WORD {
-			if currentval == "" {
-				currentval = currentfrag.text
-			} else if currenttype == "" {
-				currenttype = currentfrag.text
-			}
-		} else if currentfrag.token == COMMA || currentfrag.token == RPAREN {
 			// hit a comma, reset
+			// Get the type of the argument
+			tparts := strings.Split(mtype.In(wordCount).String(), ".")
+			atype := tparts[len(tparts)-1] // Get whatever is at the final element of the split
 			var c Converter
 			var ok bool
-			if c, ok = i.converters[currenttype]; !ok {
-				return nil, fmt.Errorf("No converter found for type: %s", currenttype)
+			if c, ok = i.converters[atype]; !ok {
+				return nil, fmt.Errorf("No converter found for type: %s", atype)
 			}
 			// Convert, error on not found
-			iv, err := c(currentval)
+			iv, err := c(currentfrag.text)
 			if err != nil {
-				return nil, fmt.Errorf("Error converting %s %s: %s", currentval, currenttype, err.Error())
+				return nil, fmt.Errorf("Error converting %s %s: %s", currentfrag.text, atype, err.Error())
 			}
 			// Add to the our list to return
-			args = append(args, iv)
-			currentval = ""
-			currenttype = ""
+			args = append(args, reflect.ValueOf(iv))
+			wordCount++ // Could just take len of args over and over but eh
 		}
-
-		j++
-		currentfrag = statement[j]
 	}
 	return args, nil
 }

@@ -38,9 +38,9 @@ var cases = []LexerTestCase{
 		},
 	},
 	{
-		statement: "o.Stuff2(false bool, 50 int)",
+		statement: "o.Stuff2(false, 50)",
 		results: []Token{
-			WORD, PERIOD, WORD, LPAREN, WORD, WS, WORD, COMMA, WS, WORD, WS, WORD, RPAREN, EOF,
+			WORD, PERIOD, WORD, LPAREN, WORD, COMMA, WS, WORD, RPAREN, EOF,
 		},
 	},
 	{
@@ -50,24 +50,11 @@ var cases = []LexerTestCase{
 		},
 	},
 	{
-		statement: "o.Dumb.DeepStuff2(true bool, 50 int)",
+		statement: "o.Dumb.DeepStuff2(true, 50)",
 		results: []Token{
-			WORD, PERIOD, WORD, PERIOD, WORD, LPAREN, WORD, WS, WORD, COMMA, WS, WORD, WS, WORD, RPAREN, EOF,
+			WORD, PERIOD, WORD, PERIOD, WORD, LPAREN, WORD, COMMA, WS, WORD, RPAREN, EOF,
 		},
 	},
-	//{
-	//	statement: "o.Stuff(100.0 float64, \"joe shmoe\" string, 'X' rune, 50 *int, true bool)",
-	//	results: []Token{
-	//		WORD, PERIOD, WORD, LPAREN, WORD, WS, WORD, COMMA, WS, WORD, WS, WORD, COMMA, WS, WORD, WS, WORD, COMMA, WS, WORD, WS, WORD, COMMA, WS, WORD, WS, WORD, RPAREN, EOF,
-	//	},
-	//},
-	//
-	//{
-	//	statement: "o.Name",
-	//	results: []Token{
-	//		WORD, PERIOD, WORD, EOF,
-	//	},
-	//},
 }
 
 type testRecord struct {
@@ -115,7 +102,7 @@ func lookup(email string) (interface{}, error) {
 }
 
 func TestLexerCases(t *testing.T) {
-	i := NewInterpreter()
+	i := newInterpreter()
 	i.RegisterFinder("testRecord", lookup)
 	for _, c := range cases {
 		fmt.Println("-----")
