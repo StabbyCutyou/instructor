@@ -58,7 +58,6 @@ It's more fun to learn this way
 * Lots of code cleanup and improvements
 * Find a better solution than my hackneyed "find" method for seeding objects into the environment. Ideally, you could just "make"/"do" whatever you want, but that's pie in the sky stuff.
 * Variable substitution when calling methods
-* Array/Slice indexing
 * Setting Properties on objects
 
 # How do I integrate it into my app?

@@ -3,6 +3,7 @@ package instructor
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/tapjoy/adfilteringservice/vendor/github.com/davecgh/go-spew/spew"
@@ -209,7 +210,7 @@ func (i *interpreter) crawlPropertyChain(statement statement) (interface{}, erro
 	// No crashing!
 	defer func() {
 		if err := recover(); err != nil {
-			fmt.Printf("Recovering from panic: %s\n", err)
+			fmt.Printf("Recovering from panicxx: %s\n", err)
 		}
 	}()
 	obj, ok := i.heap[statement[0].text]
@@ -217,15 +218,27 @@ func (i *interpreter) crawlPropertyChain(statement statement) (interface{}, erro
 		return nil, fmt.Errorf("Error: Unknown variable %s", statement[0].text)
 	}
 	currentVal := reflect.ValueOf(obj)
-
+	parsingIndex := false
 	for _, f := range statement[1:] {
-		if f.token != EOF && f.token != PERIOD {
-			// Deref if we're dealing with a pointer
-			if currentVal.Kind() == reflect.Ptr {
-				currentVal = currentVal.Elem()
+		if f.token != EOF && f.token != PERIOD && f.token != RBRACK {
+			if f.token == LBRACK {
+				parsingIndex = true
+			} else if parsingIndex {
+				indexval, err := strconv.Atoi(f.text)
+				if err != nil {
+					return nil, fmt.Errorf("Error: Unable to use %s as an index value for %v. Original error: %s", f.text, currentVal, err.Error())
+				}
+				currentVal = currentVal.Index(indexval)
+				parsingIndex = false
+			} else {
+				// We're not dealing with an indexing operation, this is a straight invocation of a property
+				// Deref if we're dealing with a pointer
+				if currentVal.Kind() == reflect.Ptr {
+					currentVal = currentVal.Elem()
+				}
+				p := currentVal.FieldByName(f.text)
+				currentVal = p
 			}
-			p := currentVal.FieldByName(f.text)
-			currentVal = p
 		}
 	}
 

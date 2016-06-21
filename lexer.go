@@ -26,6 +26,8 @@ const (
 	WORD                 // 10: anything that isn't a reserved word / token, like properties, function names, variables, or even literals like literal value, like 5, 50.0, or "joseph"
 	FIND                 // 11: built in helper for locating structs, hacky
 	TICK                 // 12: `
+	LBRACK               // 13: [
+	RBRACK               // 14: ]
 )
 
 const eof = rune(0)
@@ -125,6 +127,10 @@ func (s *scanner) Scan() fragment {
 		return fragment{token: COMMA, text: string(c)}
 	case ')':
 		return fragment{token: RPAREN, text: string(c)}
+	case '[':
+		return fragment{token: LBRACK, text: string(c)}
+	case ']':
+		return fragment{token: RBRACK, text: string(c)}
 	default:
 		return fragment{token: WORD, text: string(c)}
 	}
