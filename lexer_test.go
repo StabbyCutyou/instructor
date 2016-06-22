@@ -161,7 +161,7 @@ func TestLexerCases(t *testing.T) {
 		for f.token != EOF {
 			f = p.scan()
 			if f.token != c.results[k] {
-				fmt.Printf("Token:%d String:%s, C:%s\n", f.token, f.text, c.results[k])
+				fmt.Printf("Got Token:%d String:%s, Expected Token:%d\n", f.token, f.text, c.results[k])
 				t.Fail()
 			}
 			statement = append(statement, f)

@@ -37,119 +37,157 @@ func newInterpreter() *interpreter {
 	}
 }
 
-// Evaluate is a set of rules dictating how the tokens will be interpreted.
-// based on each token, starting with the first, it will walk down a decision
-// tree to determine what to do next
-// This method is becoming a hard to maintain mess
-// Consider: breaking the method up into something that determines what "type"
-// of statement it is, and simplify the forking logic?
-func (i *interpreter) Evaluate(statement statement) error {
+type statementType int
+
+const (
+	INVALID      = iota // 0
+	ASSIGNMENT          // 1
+	METHODCALL          // 2
+	PROPERTYCALL        // 3
+	INSPECT             // 4
+	LOOKUP              // 5
+)
+
+type preparedStatement struct {
+	fullStatement statement
+	lhs           statement
+	rhs           statement
+	t             statementType
+}
+
+func (i *interpreter) prepareStatement(s statement) (preparedStatement, error) {
 	// First thing, lets just make sure no pesky whitespace is hanging around
-	// As a quick cheat, because it's possible, and this is why i'm starting to hate find...
-	// We'll check for it first as a special case, and send it down the rabbit hole
-	statement = cleanWhitespace(statement)
-	firstFragment := statement[0]
-	if firstFragment.token == FIND {
+	s = cleanWhitespace(s)
+	ps := preparedStatement{fullStatement: s}
+	// Fail fast if it's a simple call to find
+	if s[0].token == FIND {
+		ps.t = LOOKUP
+		ps.lhs = s
+		return ps, nil
+	}
+	// Fail fast if it's just inspecting a variable
+	if len(s) == 2 && s[0].token == WORD {
+		ps.t = INSPECT
+		ps.lhs = s
+		return ps, nil
+	}
+	for i := 0; i < len(s); i++ {
+		f := s[i]
+		// If there is a singleequal anywhere, this puts us into a lhs = rhs assignment
+		if f.token == ASSIGN {
+			ps.t = ASSIGNMENT
+			ps.lhs = s[0:i]  // Everything on the left of the = is LHS
+			ps.rhs = s[i+1:] // Everything +1 the current point is the RHS
+			return ps, nil
+		} else if f.token == LPAREN {
+			// If we haven't hit an assignment but there is a ( somewhere, this is a direct method invocation
+			ps.t = METHODCALL
+			ps.lhs = s
+			return ps, nil
+		}
+	}
+	// If it wasn't a variable inspection, and there were no = or ( found, it must be a property invocation
+	ps.t = PROPERTYCALL
+	ps.lhs = s
+	return ps, nil
+}
+
+// Evaluate is a set of rules dictating how the tokens will be interpreted.
+func (i *interpreter) Evaluate(s statement) error {
+	obj, err := i.evaluateStatement(s)
+	if err != nil {
+		return err
+	}
+	spew.Dump(obj)
+	return nil
+}
+
+// Evaluate is a set of rules dictating how the tokens will be interpreted.
+func (i *interpreter) evaluateStatement(s statement) (interface{}, error) {
+	ps, err := i.prepareStatement(s)
+	if err != nil {
+		return nil, err
+	}
+	switch ps.t {
+	case INSPECT:
+		obj, err := i.lookupVariable(ps.lhs)
+		if err != nil {
+			return nil, err
+		}
+		return obj, nil
+	case LOOKUP:
 		// Pass from the 4th token on (LPAREN <-> RPAREN : EOF))
 		// get back arguments for dynamic finder
-		stype, id, err := statementToFindArgs(statement[1:])
+		stype, id, err := statementToFindArgs(ps.lhs[1:])
 		if err != nil {
-			return err
+			return nil, err
 		}
 		obj, err := i.find(stype, id)
-		spew.Dump(obj)
-
-	} else if firstFragment.token == WORD {
-		// This could be either:
-		// xassigning an operation to a variable
-		// xcalling a variable (spew results)
-		// calling a method on a variable
-		// calling a property on a variable
-		if statement[1].token == EOF {
-			// They called a variable - display it
-			// TODO if keywords other than find exist, this needs rethought
-			if err := i.printVariable(statement); err != nil {
-				return err
-			}
-		} else if statement[1].token == ASSIGN && len(statement) > 3 {
-			// This means we're doing an assignment.
-			// Could be from a find call, or a property/method call
-			if statement[2].token == FIND {
-				//x = find(model, 123)
-				// Pass from the 4th token on (LPAREN <-> RPAREN : EOF))
-				// get back arguments for dynamic finder
-				stype, id, err := statementToFindArgs(statement[3:])
-				if err != nil {
-					return err
-				}
-				obj, err := i.find(stype, id)
-				if err != nil {
-					return err
-				}
-				// Store it on the heap with the variable name, ie the first fragments text
-				if err := i.storeInHeap(firstFragment.text, obj); err != nil {
-					return err
-				}
-				spew.Dump(obj)
-			} else if statement[2].token == WORD {
-				// something like x = y so far...
-				if statement[3].token == PERIOD {
-					// we've got something like x = y. - we're going to chain down a series of calls
-					// we need to traverse the call stack to get the object to assign to x
-					var obj interface{}
-					var err error
-					chain, args := statementToInvocationChainAndParams(statement)
-
-					if statement[len(statement)-2].token == RPAREN { // If the next to last is a RPAREN, meaning it's a function call
-						obj, err = i.callMethodChain(chain[2:], args)
-					} else {
-						// else, it's a normal property
-						obj, err = i.callPropertyChain(chain[2:])
-					}
-					if err != nil {
-						return err
-					}
-					// Now, assign it to the id on the left
-					i.storeInHeap(statement[0].text, obj)
-
-				} else {
-					// We've got a simple one, like x = y, where y is a variable or literal
-					obj, ok := i.heap[statement[2].text]
-					if !ok {
-						return fmt.Errorf("Error: unknown variable %s", statement[0].text)
-					}
-					i.storeInHeap(statement[0].text, obj)
-					spew.Dump(obj)
-				}
-			}
-		} else if statement[1].token == PERIOD {
-			//x.Method() or x.Property, or a chain of them
-			// First, we need to break the statement into pieces:
-			// if it's a property call, then we're fine
-			// if it's a method call, we need the chain, then the arguments
-			chain, args := statementToInvocationChainAndParams(statement)
-			if args == nil {
-				// It's a property invocation
-				// The first word in the statement is the variable
-				// the next N are the property chains
-				if _, err := i.callPropertyChain(chain); err != nil {
-					return err
-				}
-			} else {
-				// It's a method invocation
-				// The first word in the statement is the variable
-				// the next N are the property chains
-				// the args are the things to invoke on the method
-				if _, err := i.callMethodChain(chain, args); err != nil {
-					return err
-				}
-			}
+		if err != nil {
+			return nil, err
 		}
-	} else {
-		return fmt.Errorf("Error: %s is not a valid token at position 0", statement[0])
-	}
+		return obj, nil
+	case METHODCALL:
+		chain, args := statementToInvocationChainAndParams(ps.lhs)
+		// It's a method invocation
+		// The first word in the statement is the variable
+		// the next N are the property chains
+		// the args are the things to invoke on the method
+		obj, err := i.callMethodChain(chain, args)
+		if err != nil {
+			return nil, err
+		}
+		return obj, nil
+	case PROPERTYCALL:
+		chain, _ := statementToInvocationChainAndParams(ps.lhs)
+		// It's a property invocation
+		// The first word in the statement is the variable
+		// the next N are the property chains
+		obj, err := i.callPropertyChain(chain)
+		if err != nil {
+			return nil, err
+		}
+		return obj, nil
+	case ASSIGNMENT:
+		// This is the remaining case to port over
+		// it's still in the lookup branch below
+		// we need to do some recursion here in the new world order
+		// send LHS and RHS down the Evaluate tree, and get back their objects
+		// then assign RHS to LHS.
+		// This requires re-designing Evaluate to return an interface{}, error
+		// likely - break this into 2 methods. A wrapper not to be recursed by the
+		// caller, and the actual method, which returns an object and an error, for
+		// the purposes of being able to be called recursively?
+		lhs, err := i.evaluateStatement(ps.lhs)
+		initVar := false
+		if err != nil && strings.Contains(err.Error(), "Unknown variable") {
+			// The left hand side is a variable call, but it hasn't been defined yet
+			// we're setting it for the first time
+			initVar = true
+		} else if err != nil {
+			return nil, err
+		}
+		rhs, err := i.evaluateStatement(ps.rhs)
+		if err != nil {
+			return nil, err
+		}
+		if initVar {
+			// LHS was a variable that didn't exist
+			i.storeInHeap(ps.lhs[0].text, rhs)
+		} else {
+			// LHS is either an existing variable
+			// or
+			// a property on something else
+			vlhs := reflect.ValueOf(lhs)
+			vlhs.Set(reflect.ValueOf(rhs))
+		}
 
-	return nil
+		return lhs, nil
+	case INVALID:
+	default:
+		return nil, fmt.Errorf("Error: \"%s\" is not a valid statement", ps.fullStatement)
+	}
+	return nil, nil
 }
 
 func (i *interpreter) callMethodChain(chain statement, args statement) ([]interface{}, error) {
@@ -316,15 +354,13 @@ func (i *interpreter) storeInHeap(id string, obj interface{}) error {
 	return nil
 }
 
-func (i *interpreter) printVariable(s statement) error {
+func (i *interpreter) lookupVariable(s statement) (interface{}, error) {
 	f := s[0]
 	obj, ok := i.heap[f.text]
 	if !ok {
-		return fmt.Errorf("Error: %s is not a known variable", f.text)
+		return nil, fmt.Errorf("Error: %s is not a known variable", f.text)
 	}
-
-	spew.Dump(obj)
-	return nil
+	return obj, nil
 }
 
 // find will find things. It is basically a replacement, all purpose object constructor/retriever
