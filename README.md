@@ -136,6 +136,7 @@ things like the following:
 * type: `o.Property`
 * type: `o.SimpleFunc()`
 * type: `o.ComplexFunc(50, true)`
+* type: `o.NestedProperty.ArrayOrSlice[2].MathFunc(600.84)`
 * So far, those are the following param types supported:
  * int
  * uint

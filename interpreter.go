@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/tapjoy/adfilteringservice/vendor/github.com/davecgh/go-spew/spew"
+	"github.com/davecgh/go-spew/spew"
 )
 
 // interpreter is a quasi-runtime that holds objects in memory, knows how to find and convert things
