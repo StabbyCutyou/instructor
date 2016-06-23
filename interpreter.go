@@ -236,7 +236,7 @@ func (i *interpreter) callMethodChain(chain statement, args statement) ([]interf
 	// No crashing!
 	defer func() {
 		if err := recover(); err != nil {
-			fmt.Printf("Recovering from panicxxxx: %s\n", err)
+			fmt.Printf("Recovering from panic: %s\n", err)
 		}
 	}()
 	var err error
@@ -290,7 +290,7 @@ func (i *interpreter) crawlPropertyChain(statement statement) (interface{}, erro
 	// No crashing!
 	defer func() {
 		if err := recover(); err != nil {
-			fmt.Printf("Recovering from panicxx: %s\n", err)
+			fmt.Printf("Recovering from panic: %s\n", err)
 		}
 	}()
 	obj, ok := i.heap[statement[0].text]
