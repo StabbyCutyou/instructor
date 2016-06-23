@@ -13,21 +13,27 @@ type Token int
 
 // Special tokens
 const (
-	ILLEGAL Token = iota // 0
-	EOF                  // 1: end of input
-	WS                   // 2: spaces/tabs
-	ASSIGN               // 3: assginment operator, =
-	PERIOD               // 4: .
-	SQUOTE               // 5: '
-	DQUOTE               // 6: "
-	COMMA                // 7: ,
-	LPAREN               // 8: (
-	RPAREN               // 9: )
-	WORD                 // 10: anything that isn't a reserved word / token, like properties, function names, variables, or even literals like literal value, like 5, 50.0, or "joseph"
-	FIND                 // 11: built in helper for locating structs, hacky
-	TICK                 // 12: `
-	LBRACK               // 13: [
-	RBRACK               // 14: ]
+	ILLEGAL  Token = iota // 0
+	EOF                   // 1: end of input
+	WS                    // 2: spaces/tabs
+	ASSIGN                // 3: assginment operator, =
+	PERIOD                // 4: .
+	SQUOTE                // 5: '
+	DQUOTE                // 6: "
+	COMMA                 // 7: ,
+	LPAREN                // 8: (
+	RPAREN                // 9: )
+	WORD                  // 10: anything that isn't a reserved word / token, like properties, function names, variables, or even literals like literal value, like 5, 50.0, or "joseph"
+	FIND                  // 11: built in helper for locating structs, hacky
+	TICK                  // 12: `
+	LBRACK                // 13: [
+	RBRACK                // 14: ]
+	VARIABLE              // 15: Any literal value that isn't a reserved word - any string not starting with single/double/tick quotes
+	FIELD                 // 16: Any string not starting with a single/double/stick quotes but preceeded by a period
+	STRING                // 15: Any literal string value
+	NUMBER                // 16: Any literal number, int or float
+	RUNE                  // 17: Any literal rune value
+	BOOL                  // 18: The keywords true or false
 )
 
 const eof = rune(0)
@@ -113,6 +119,9 @@ func (s *scanner) Scan() fragment {
 	} else if isDigit(c) {
 		s.unread()
 		return s.scanNumber()
+	} else if c == '.' {
+		// Scan a word until the next period, eof, or lparen
+		return s.scanField()
 	}
 
 	// Otherwise, see what kind of token it was
@@ -174,7 +183,7 @@ func (s *scanner) scanNumber() fragment {
 		}
 	}
 
-	return fragment{token: WORD, text: b.String()}
+	return fragment{token: NUMBER, text: b.String()}
 }
 
 func (s *scanner) scanString(boundaryRune rune) fragment {
@@ -194,7 +203,7 @@ func (s *scanner) scanString(boundaryRune rune) fragment {
 		}
 	}
 
-	return fragment{token: WORD, text: b.String()}
+	return fragment{token: STRING, text: b.String()}
 }
 
 func (s *scanner) scanRune() fragment {
@@ -214,7 +223,31 @@ func (s *scanner) scanRune() fragment {
 		}
 	}
 
-	return fragment{token: WORD, text: b.String()}
+	return fragment{token: RUNE, text: b.String()}
+}
+
+func (s *scanner) scanField() fragment {
+	// Buffer in the current character, which should be a period
+	b := bytes.Buffer{}
+	b.WriteRune(s.read())
+
+	for {
+		if c := s.read(); c == eof {
+			// It was the last field in the chain
+			break
+		} else if c == '.' || c == '(' || c == '[' {
+			// end of this field, start of another.
+			// or
+			// end of the method name
+			// unread so the next scan gets the period.
+			s.unread()
+			break
+		} else {
+			b.WriteRune(c)
+		}
+	}
+
+	return fragment{token: FIELD, text: b.String()}
 }
 
 func (s *scanner) scanWord() fragment {
@@ -240,8 +273,10 @@ func (s *scanner) scanWord() fragment {
 	switch word {
 	case "find":
 		return fragment{token: FIND, text: word}
+	case "true", "false":
+		return fragment{token: BOOL, text: word}
 	}
-	return fragment{token: WORD, text: word}
+	return fragment{token: VARIABLE, text: word}
 }
 
 func (l *lexer) scan() fragment {

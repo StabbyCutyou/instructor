@@ -195,7 +195,7 @@ func (i *interpreter) callMethodChain(chain statement, args statement) ([]interf
 	// No crashing!
 	defer func() {
 		if err := recover(); err != nil {
-			fmt.Printf("Recovering from panic: %s\n", err)
+			fmt.Printf("Recovering from panicxxxx: %s\n", err)
 		}
 	}()
 	var err error
@@ -395,7 +395,7 @@ func (i *interpreter) statementToArgs(mtype reflect.Type, s statement) ([]reflec
 	wordCount := 0
 	// TODO this feels like a super hacky way to do this. Improve it?
 	for _, currentfrag := range s {
-		if currentfrag.token == WORD {
+		if isValueToken(currentfrag.token) {
 			// hit a comma, reset
 			// Get the type of the argument
 			tparts := strings.Split(mtype.In(wordCount).String(), ".")
@@ -416,4 +416,11 @@ func (i *interpreter) statementToArgs(mtype reflect.Type, s statement) ([]reflec
 		}
 	}
 	return args, nil
+}
+
+func isValueToken(t Token) bool {
+	if STRING <= t && t <= BOOL {
+		return true
+	}
+	return false
 }

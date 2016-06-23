@@ -18,55 +18,55 @@ var cases = []LexerTestCase{
 	{
 		statement: "o = find(testRecord,\"smedley@gmail.com\")",
 		results: []Token{
-			WORD, WS, ASSIGN, WS, FIND, LPAREN, WORD, COMMA, WORD, RPAREN, EOF,
+			VARIABLE, WS, ASSIGN, WS, FIND, LPAREN, VARIABLE, COMMA, STRING, RPAREN, EOF,
 		},
 	},
 	{
 		statement: "o",
 		results: []Token{
-			WORD, EOF,
+			VARIABLE, EOF,
 		},
 	},
 	{
 		statement: "o.Dumb.Yes",
 		results: []Token{
-			WORD, PERIOD, WORD, PERIOD, WORD, EOF,
+			VARIABLE, FIELD, FIELD, EOF,
 		},
 	},
 	{
 		statement: "o.Stuff()",
 		results: []Token{
-			WORD, PERIOD, WORD, LPAREN, RPAREN, EOF,
+			VARIABLE, FIELD, LPAREN, RPAREN, EOF,
 		},
 	},
 	{
 		statement: "o.Stuff2(false, 50)",
 		results: []Token{
-			WORD, PERIOD, WORD, LPAREN, WORD, COMMA, WS, WORD, RPAREN, EOF,
+			VARIABLE, FIELD, LPAREN, BOOL, COMMA, WS, NUMBER, RPAREN, EOF,
 		},
 	},
 	{
 		statement: "o.Dumb.DeepStuff()",
 		results: []Token{
-			WORD, PERIOD, WORD, PERIOD, WORD, LPAREN, RPAREN, EOF,
+			VARIABLE, FIELD, FIELD, LPAREN, RPAREN, EOF,
 		},
 	},
 	{
 		statement: "o.Dumb.DeepStuff2(true, 50)",
 		results: []Token{
-			WORD, PERIOD, WORD, PERIOD, WORD, LPAREN, WORD, COMMA, WS, WORD, RPAREN, EOF,
+			VARIABLE, FIELD, FIELD, LPAREN, BOOL, COMMA, WS, NUMBER, RPAREN, EOF,
 		},
 	},
 	{
 		statement: "o.Dumb.DeepStuff3(`{\"floops\":5}`)",
 		results: []Token{
-			WORD, PERIOD, WORD, PERIOD, WORD, LPAREN, WORD, RPAREN, EOF,
+			VARIABLE, FIELD, FIELD, LPAREN, STRING, RPAREN, EOF,
 		},
 	},
 	{
 		statement: "o.Orders[1].CustomID(true)",
 		results: []Token{
-			WORD, PERIOD, WORD, LBRACK, WORD, RBRACK, PERIOD, WORD, LPAREN, WORD, RPAREN, EOF,
+			VARIABLE, FIELD, LBRACK, NUMBER, RBRACK, FIELD, LPAREN, BOOL, RPAREN, EOF,
 		},
 	},
 }
