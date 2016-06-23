@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"io"
+	"strings"
 )
 
 // The approach in this file was lifted heavily from https://blog.gopheracademy.com/advent-2014/parsers-lexers/
@@ -43,14 +44,19 @@ const (
 	MOD                     // 206: Modulo operator
 )
 
-// Literal value and variable expression tokens
+// Field and variable tokens
 const (
 	VARIABLE Token = 300 + iota // 300: Any literal value that isn't a reserved word - any string not starting with single/double/tick quotes
 	FIELD                       // 301: Any string not starting with a single/double/stick quotes but preceeded by a period
-	STRING                      // 302: Any literal string value
-	NUMBER                      // 303: Any literal number, int or float
-	RUNE                        // 304: Any literal rune value
-	BOOL                        // 305: The keywords true or false
+)
+
+// Literal value tokens
+const (
+	STRING Token = 400 + iota // 302: Any literal string value
+	INT                       // 303: Any literal number without a decimal
+	FLOAT                     // 304: Any literal number with a decimal
+	RUNE                      // 305: Any literal rune value
+	BOOL                      // 306: The keywords true or false
 )
 
 const eof = rune(0)
@@ -64,7 +70,7 @@ type scanner struct {
 
 type tokenBuffer struct {
 	t Token  // last token read
-	l string //last literal read
+	l string // last literal read
 	n int    // size
 }
 
@@ -200,7 +206,11 @@ func (s *scanner) scanNumber() fragment {
 		}
 	}
 
-	return fragment{token: NUMBER, text: b.String()}
+	text := b.String()
+	if strings.Contains(text, ".") {
+		return fragment{token: FLOAT, text: b.String()}
+	}
+	return fragment{token: INT, text: b.String()}
 }
 
 func (s *scanner) scanString(boundaryRune rune) fragment {
@@ -252,10 +262,12 @@ func (s *scanner) scanField() fragment {
 		if c := s.read(); c == eof {
 			// It was the last field in the chain
 			break
-		} else if c == '.' || c == '(' || c == '[' {
+		} else if c == '.' || c == '(' || c == '[' || isWhitespace(c) {
 			// end of this field, start of another.
 			// or
 			// end of the method name
+			// or
+			// end of the field prior to an assign or equality check
 			// unread so the next scan gets the period.
 			s.unread()
 			break
