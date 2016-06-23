@@ -174,6 +174,7 @@ func (i *interpreter) evaluateStatement(s statement) (interface{}, error) {
 		if initVar {
 			// LHS was a variable that didn't exist
 			i.storeInHeap(ps.lhs[0].text, rhs)
+			lhs = rhs
 		} else {
 			// LHS is either an existing variable
 			// or
