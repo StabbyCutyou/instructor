@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"io"
+	"strings"
 )
 
 // The approach in this file was lifted heavily from https://blog.gopheracademy.com/advent-2014/parsers-lexers/
@@ -11,23 +12,51 @@ import (
 // Token represents a lexical token.
 type Token int
 
-// Special tokens
+// Low level tokens - things looked for sepcifically by name in the interpreter
 const (
 	ILLEGAL Token = iota // 0
 	EOF                  // 1: end of input
 	WS                   // 2: spaces/tabs
-	ASSIGN               // 3: assginment operator, =
-	PERIOD               // 4: .
-	SQUOTE               // 5: '
-	DQUOTE               // 6: "
-	COMMA                // 7: ,
-	LPAREN               // 8: (
-	RPAREN               // 9: )
-	WORD                 // 10: anything that isn't a reserved word / token, like properties, function names, variables, or even literals like literal value, like 5, 50.0, or "joseph"
-	FIND                 // 11: built in helper for locating structs, hacky
-	TICK                 // 12: `
-	LBRACK               // 13: [
-	RBRACK               // 14: ]
+)
+
+// Operational tokens - things looked for by name, but are more meaningful
+const (
+	ASSIGN Token = 100 + iota // 100: assginment operator, =
+	PERIOD                    // 101: .
+	SQUOTE                    // 102: '
+	DQUOTE                    // 103: "
+	COMMA                     // 104: ,
+	LPAREN                    // 105: (
+	RPAREN                    // 106: )
+	TICK                      // 107: `
+	LBRACK                    // 108: [
+	RBRACK                    // 109: ]
+)
+
+// Reserved words - special operators and functions, pre-defined by the "runtime"
+const (
+	WORD Token = 200 + iota // 200: Placeholder, should be unused
+	FIND                    // 201: built in helper for locating structs, hacky
+	ADD                     // 202: Addition operator
+	SUB                     // 203: Subtraction operator
+	DIV                     // 204: Division operator
+	MULT                    // 205: Multiplication operator
+	MOD                     // 206: Modulo operator
+)
+
+// Field and variable tokens
+const (
+	VARIABLE Token = 300 + iota // 300: Any literal value that isn't a reserved word - any string not starting with single/double/tick quotes
+	FIELD                       // 301: Any string not starting with a single/double/stick quotes but preceeded by a period
+)
+
+// Literal value tokens
+const (
+	STRING Token = 400 + iota // 302: Any literal string value
+	INT                       // 303: Any literal number without a decimal
+	FLOAT                     // 304: Any literal number with a decimal
+	RUNE                      // 305: Any literal rune value
+	BOOL                      // 306: The keywords true or false
 )
 
 const eof = rune(0)
@@ -41,7 +70,7 @@ type scanner struct {
 
 type tokenBuffer struct {
 	t Token  // last token read
-	l string //last literal read
+	l string // last literal read
 	n int    // size
 }
 
@@ -113,6 +142,9 @@ func (s *scanner) Scan() fragment {
 	} else if isDigit(c) {
 		s.unread()
 		return s.scanNumber()
+	} else if c == '.' {
+		// Scan a word until the next period, eof, or lparen
+		return s.scanField()
 	}
 
 	// Otherwise, see what kind of token it was
@@ -174,7 +206,11 @@ func (s *scanner) scanNumber() fragment {
 		}
 	}
 
-	return fragment{token: WORD, text: b.String()}
+	text := b.String()
+	if strings.Contains(text, ".") {
+		return fragment{token: FLOAT, text: b.String()}
+	}
+	return fragment{token: INT, text: b.String()}
 }
 
 func (s *scanner) scanString(boundaryRune rune) fragment {
@@ -194,7 +230,7 @@ func (s *scanner) scanString(boundaryRune rune) fragment {
 		}
 	}
 
-	return fragment{token: WORD, text: b.String()}
+	return fragment{token: STRING, text: b.String()}
 }
 
 func (s *scanner) scanRune() fragment {
@@ -214,7 +250,33 @@ func (s *scanner) scanRune() fragment {
 		}
 	}
 
-	return fragment{token: WORD, text: b.String()}
+	return fragment{token: RUNE, text: b.String()}
+}
+
+func (s *scanner) scanField() fragment {
+	// Buffer in the current character, which should be a period
+	b := bytes.Buffer{}
+	b.WriteRune(s.read())
+
+	for {
+		if c := s.read(); c == eof {
+			// It was the last field in the chain
+			break
+		} else if c == '.' || c == '(' || c == '[' || isWhitespace(c) {
+			// end of this field, start of another.
+			// or
+			// end of the method name
+			// or
+			// end of the field prior to an assign or equality check
+			// unread so the next scan gets the period.
+			s.unread()
+			break
+		} else {
+			b.WriteRune(c)
+		}
+	}
+
+	return fragment{token: FIELD, text: b.String()}
 }
 
 func (s *scanner) scanWord() fragment {
@@ -240,8 +302,10 @@ func (s *scanner) scanWord() fragment {
 	switch word {
 	case "find":
 		return fragment{token: FIND, text: word}
+	case "true", "false":
+		return fragment{token: BOOL, text: word}
 	}
-	return fragment{token: WORD, text: word}
+	return fragment{token: VARIABLE, text: word}
 }
 
 func (l *lexer) scan() fragment {
