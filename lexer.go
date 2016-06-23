@@ -11,29 +11,46 @@ import (
 // Token represents a lexical token.
 type Token int
 
-// Special tokens
+// Low level tokens - things looked for sepcifically by name in the interpreter
 const (
-	ILLEGAL  Token = iota // 0
-	EOF                   // 1: end of input
-	WS                    // 2: spaces/tabs
-	ASSIGN                // 3: assginment operator, =
-	PERIOD                // 4: .
-	SQUOTE                // 5: '
-	DQUOTE                // 6: "
-	COMMA                 // 7: ,
-	LPAREN                // 8: (
-	RPAREN                // 9: )
-	WORD                  // 10: anything that isn't a reserved word / token, like properties, function names, variables, or even literals like literal value, like 5, 50.0, or "joseph"
-	FIND                  // 11: built in helper for locating structs, hacky
-	TICK                  // 12: `
-	LBRACK                // 13: [
-	RBRACK                // 14: ]
-	VARIABLE              // 15: Any literal value that isn't a reserved word - any string not starting with single/double/tick quotes
-	FIELD                 // 16: Any string not starting with a single/double/stick quotes but preceeded by a period
-	STRING                // 15: Any literal string value
-	NUMBER                // 16: Any literal number, int or float
-	RUNE                  // 17: Any literal rune value
-	BOOL                  // 18: The keywords true or false
+	ILLEGAL Token = iota // 0
+	EOF                  // 1: end of input
+	WS                   // 2: spaces/tabs
+)
+
+// Operational tokens - things looked for by name, but are more meaningful
+const (
+	ASSIGN Token = 100 + iota // 100: assginment operator, =
+	PERIOD                    // 101: .
+	SQUOTE                    // 102: '
+	DQUOTE                    // 103: "
+	COMMA                     // 104: ,
+	LPAREN                    // 105: (
+	RPAREN                    // 106: )
+	TICK                      // 107: `
+	LBRACK                    // 108: [
+	RBRACK                    // 109: ]
+)
+
+// Reserved words - special operators and functions, pre-defined by the "runtime"
+const (
+	WORD Token = 200 + iota // 200: Placeholder, should be unused
+	FIND                    // 201: built in helper for locating structs, hacky
+	ADD                     // 202: Addition operator
+	SUB                     // 203: Subtraction operator
+	DIV                     // 204: Division operator
+	MULT                    // 205: Multiplication operator
+	MOD                     // 206: Modulo operator
+)
+
+// Literal value and variable expression tokens
+const (
+	VARIABLE Token = 300 + iota // 300: Any literal value that isn't a reserved word - any string not starting with single/double/tick quotes
+	FIELD                       // 301: Any string not starting with a single/double/stick quotes but preceeded by a period
+	STRING                      // 302: Any literal string value
+	NUMBER                      // 303: Any literal number, int or float
+	RUNE                        // 304: Any literal rune value
+	BOOL                        // 305: The keywords true or false
 )
 
 const eof = rune(0)
