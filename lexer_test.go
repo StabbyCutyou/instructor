@@ -42,7 +42,7 @@ var cases = []LexerTestCase{
 	{
 		statement: "o.Stuff2(false, 50)",
 		results: []Token{
-			VARIABLE, FIELD, LPAREN, BOOL, COMMA, WS, NUMBER, RPAREN, EOF,
+			VARIABLE, FIELD, LPAREN, BOOL, COMMA, WS, INT, RPAREN, EOF,
 		},
 	},
 	{
@@ -54,7 +54,7 @@ var cases = []LexerTestCase{
 	{
 		statement: "o.Dumb.DeepStuff2(true, 50)",
 		results: []Token{
-			VARIABLE, FIELD, FIELD, LPAREN, BOOL, COMMA, WS, NUMBER, RPAREN, EOF,
+			VARIABLE, FIELD, FIELD, LPAREN, BOOL, COMMA, WS, INT, RPAREN, EOF,
 		},
 	},
 	{
@@ -66,7 +66,7 @@ var cases = []LexerTestCase{
 	{
 		statement: "o.Orders[1].CustomID(true)",
 		results: []Token{
-			VARIABLE, FIELD, LBRACK, NUMBER, RBRACK, FIELD, LPAREN, BOOL, RPAREN, EOF,
+			VARIABLE, FIELD, LBRACK, INT, RBRACK, FIELD, LPAREN, BOOL, RPAREN, EOF,
 		},
 	},
 }

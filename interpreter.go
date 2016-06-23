@@ -46,6 +46,7 @@ const (
 	PROPERTYCALL        // 3
 	INSPECT             // 4
 	LOOKUP              // 5
+	LITERAL             // 6
 )
 
 type preparedStatement struct {
@@ -65,11 +66,17 @@ func (i *interpreter) prepareStatement(s statement) (preparedStatement, error) {
 		ps.lhs = s
 		return ps, nil
 	}
-	// Fail fast if it's just inspecting a variable
-	if len(s) == 2 && s[0].token == WORD {
-		ps.t = INSPECT
-		ps.lhs = s
-		return ps, nil
+	// Fail fast if it's just inspecting a variable/literal
+	if len(s) == 2 {
+		if s[0].token == VARIABLE {
+			ps.t = INSPECT
+			ps.lhs = s
+			return ps, nil
+		} else if isValueToken(s[0].token) {
+			ps.t = LITERAL
+			ps.lhs = s
+			return ps, nil
+		}
 	}
 	for i := 0; i < len(s); i++ {
 		f := s[i]
@@ -127,6 +134,40 @@ func (i *interpreter) evaluateStatement(s statement) (interface{}, error) {
 			return nil, err
 		}
 		return obj, nil
+	case LITERAL:
+		// Like a variable, but just a literal value
+		switch s[0].token {
+		case BOOL:
+			obj, err := stringToBool(s[0].text)
+			if err != nil {
+				return nil, err
+			}
+			return obj, nil
+		case RUNE:
+			obj, err := stringToRune(s[0].text)
+			if err != nil {
+				return nil, err
+			}
+			return obj, nil
+		case STRING:
+			obj, err := stringToString(s[0].text)
+			if err != nil {
+				return nil, err
+			}
+			return obj, nil
+		case INT:
+			obj, err := stringToInt(s[0].text)
+			if err != nil {
+				return nil, err
+			}
+			return obj, nil
+		case FLOAT:
+			obj, err := stringToFloat64(s[0].text)
+			if err != nil {
+				return nil, err
+			}
+			return obj, nil
+		}
 	case METHODCALL:
 		chain, args := statementToInvocationChainAndParams(ps.lhs)
 		// It's a method invocation
