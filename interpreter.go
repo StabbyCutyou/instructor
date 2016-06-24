@@ -436,7 +436,7 @@ func (i *interpreter) statementToArgs(mtype reflect.Type, s statement) ([]reflec
 	wordCount := 0
 	// TODO this feels like a super hacky way to do this. Improve it?
 	for _, currentfrag := range s {
-		if isValueToken(currentfrag.token) {
+		if isValueToken(currentfrag.token) || currentfrag.token == VARIABLE {
 			// hit a comma, reset
 			// Get the type of the argument
 			tparts := strings.Split(mtype.In(wordCount).String(), ".")
@@ -446,13 +446,23 @@ func (i *interpreter) statementToArgs(mtype reflect.Type, s statement) ([]reflec
 			if c, ok = i.converters[atype]; !ok {
 				return nil, fmt.Errorf("No converter found for type: %s", atype)
 			}
-			// Convert, error on not found
-			iv, err := c(currentfrag.text)
-			if err != nil {
-				return nil, fmt.Errorf("Error converting %s %s: %s", currentfrag.text, atype, err.Error())
+			var obj interface{}
+			var err error
+			if currentfrag.token == VARIABLE {
+				if obj, ok = i.heap[currentfrag.text]; !ok {
+					return nil, fmt.Errorf("Error: unknown variable %s", currentfrag.text)
+
+				}
+			} else {
+				// Convert, error on not found
+				obj, err = c(currentfrag.text)
+				if err != nil {
+					return nil, fmt.Errorf("Error converting %s %s: %s", currentfrag.text, atype, err.Error())
+				}
 			}
+
 			// Add to the our list to return
-			args = append(args, reflect.ValueOf(iv))
+			args = append(args, reflect.ValueOf(obj))
 			wordCount++ // Could just take len of args over and over but eh
 		}
 	}

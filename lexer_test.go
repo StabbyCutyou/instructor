@@ -52,9 +52,15 @@ var cases = []LexerTestCase{
 		},
 	},
 	{
-		statement: "o.Dumb.DeepStuff2(true, 50)",
+		statement: "x = true",
 		results: []Token{
-			VARIABLE, FIELD, FIELD, LPAREN, BOOL, COMMA, WS, INT, RPAREN, EOF,
+			VARIABLE, WS, ASSIGN, WS, BOOL, EOF,
+		},
+	},
+	{
+		statement: "o.Dumb.DeepStuff2(x, 50)",
+		results: []Token{
+			VARIABLE, FIELD, FIELD, LPAREN, VARIABLE, COMMA, WS, INT, RPAREN, EOF,
 		},
 	},
 	{
