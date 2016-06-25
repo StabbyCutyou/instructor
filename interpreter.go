@@ -136,38 +136,24 @@ func (i *interpreter) evaluateStatement(s statement) (interface{}, error) {
 		return obj, nil
 	case LITERAL:
 		// Like a variable, but just a literal value
+		var obj interface{}
+		var err error
 		switch s[0].token {
 		case BOOL:
-			obj, err := stringToBool(s[0].text)
-			if err != nil {
-				return nil, err
-			}
-			return obj, nil
+			obj, err = stringToBool(s[0].text)
 		case RUNE:
-			obj, err := stringToRune(s[0].text)
-			if err != nil {
-				return nil, err
-			}
-			return obj, nil
+			obj, err = stringToRune(s[0].text)
 		case STRING:
-			obj, err := stringToString(s[0].text)
-			if err != nil {
-				return nil, err
-			}
-			return obj, nil
+			obj, err = stringToString(s[0].text)
 		case INT:
-			obj, err := stringToInt(s[0].text)
-			if err != nil {
-				return nil, err
-			}
-			return obj, nil
+			obj, err = stringToInt(s[0].text)
 		case FLOAT:
-			obj, err := stringToFloat64(s[0].text)
-			if err != nil {
-				return nil, err
-			}
-			return obj, nil
+			obj, err = stringToFloat64(s[0].text)
 		}
+		if err != nil {
+			return nil, err
+		}
+		return obj, nil
 	case METHODCALL:
 		chain, args := statementToInvocationChainAndParams(ps.lhs)
 		// It's a method invocation
@@ -208,6 +194,7 @@ func (i *interpreter) evaluateStatement(s statement) (interface{}, error) {
 		} else if err != nil {
 			return nil, err
 		}
+
 		rhs, err := i.evaluateStatement(ps.rhs)
 		if err != nil {
 			return nil, err
@@ -440,18 +427,15 @@ func (i *interpreter) statementToArgs(mtype reflect.Type, s statement) ([]reflec
 			// hit a comma, reset
 			// Get the type of the argument
 			tparts := strings.Split(mtype.In(wordCount).String(), ".")
-			fmt.Printf("TPARTS %v", tparts)
 			atype := tparts[len(tparts)-1] // Get whatever is at the final element of the split
 			var c Converter
 			var ok bool
 			if c, ok = i.converters[atype]; !ok {
-				fmt.Println("NOPE1")
 				return nil, fmt.Errorf("No converter found for type: %s", atype)
 			}
 			// Convert, error on not found
 			iv, err := c(currentfrag.text)
 			if err != nil {
-				fmt.Println("NOPE2")
 				return nil, fmt.Errorf("Error converting %s %s: %s", currentfrag.text, atype, err.Error())
 			}
 			// Add to the our list to return
