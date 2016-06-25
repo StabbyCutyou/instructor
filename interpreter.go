@@ -24,15 +24,15 @@ func newInterpreter() *interpreter {
 		heap:    make(heap),
 		converters: map[string]Converter{
 			"bool":     stringToBool,
-			"*bool":    stringToBool,
+			"*bool":    stringToPBool,
 			"int":      stringToInt,
-			"*int":     stringToInt,
+			"*int":     stringToPInt,
 			"uint":     stringToUint,
 			"*uint":    stringToPUint,
 			"float64":  stringToFloat64,
-			"*float64": stringToFloat64,
+			"*float64": stringToPFloat64,
 			"string":   stringToString,
-			"*string":  stringToString,
+			"*string":  stringToPString,
 		},
 	}
 }
@@ -440,15 +440,18 @@ func (i *interpreter) statementToArgs(mtype reflect.Type, s statement) ([]reflec
 			// hit a comma, reset
 			// Get the type of the argument
 			tparts := strings.Split(mtype.In(wordCount).String(), ".")
+			fmt.Printf("TPARTS %v", tparts)
 			atype := tparts[len(tparts)-1] // Get whatever is at the final element of the split
 			var c Converter
 			var ok bool
 			if c, ok = i.converters[atype]; !ok {
+				fmt.Println("NOPE1")
 				return nil, fmt.Errorf("No converter found for type: %s", atype)
 			}
 			// Convert, error on not found
 			iv, err := c(currentfrag.text)
 			if err != nil {
+				fmt.Println("NOPE2")
 				return nil, fmt.Errorf("Error converting %s %s: %s", currentfrag.text, atype, err.Error())
 			}
 			// Add to the our list to return

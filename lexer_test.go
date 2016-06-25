@@ -69,6 +69,12 @@ var cases = []LexerTestCase{
 			VARIABLE, FIELD, LBRACK, INT, RBRACK, FIELD, LPAREN, BOOL, RPAREN, EOF,
 		},
 	},
+	{
+		statement: "o.Dumb.DeepStuff4(60)",
+		results: []Token{
+			VARIABLE, FIELD, FIELD, LPAREN, INT, RPAREN, EOF,
+		},
+	},
 }
 
 type testRecord struct {
@@ -111,6 +117,10 @@ func (n nestedProperty) DeepStuff2(a bool, b int) int {
 
 func (n nestedProperty) DeepStuff3(f Flooper) int {
 	return f.Floops
+}
+
+func (n nestedProperty) DeepStuff4(i *int) int {
+	return *i + 1
 }
 
 func (t *testRecord) Stuff() int {
