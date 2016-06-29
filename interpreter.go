@@ -24,15 +24,15 @@ func newInterpreter() *interpreter {
 		heap:    make(heap),
 		converters: map[string]Converter{
 			"bool":     stringToBool,
-			"*bool":    stringToBool,
+			"*bool":    stringToPBool,
 			"int":      stringToInt,
-			"*int":     stringToInt,
+			"*int":     stringToPInt,
 			"uint":     stringToUint,
 			"*uint":    stringToPUint,
 			"float64":  stringToFloat64,
-			"*float64": stringToFloat64,
+			"*float64": stringToPFloat64,
 			"string":   stringToString,
-			"*string":  stringToString,
+			"*string":  stringToPString,
 		},
 	}
 }
@@ -136,38 +136,24 @@ func (i *interpreter) evaluateStatement(s statement) (interface{}, error) {
 		return obj, nil
 	case LITERAL:
 		// Like a variable, but just a literal value
+		var obj interface{}
+		var err error
 		switch s[0].token {
 		case BOOL:
-			obj, err := stringToBool(s[0].text)
-			if err != nil {
-				return nil, err
-			}
-			return obj, nil
+			obj, err = stringToBool(s[0].text)
 		case RUNE:
-			obj, err := stringToRune(s[0].text)
-			if err != nil {
-				return nil, err
-			}
-			return obj, nil
+			obj, err = stringToRune(s[0].text)
 		case STRING:
-			obj, err := stringToString(s[0].text)
-			if err != nil {
-				return nil, err
-			}
-			return obj, nil
+			obj, err = stringToString(s[0].text)
 		case INT:
-			obj, err := stringToInt(s[0].text)
-			if err != nil {
-				return nil, err
-			}
-			return obj, nil
+			obj, err = stringToInt(s[0].text)
 		case FLOAT:
-			obj, err := stringToFloat64(s[0].text)
-			if err != nil {
-				return nil, err
-			}
-			return obj, nil
+			obj, err = stringToFloat64(s[0].text)
 		}
+		if err != nil {
+			return nil, err
+		}
+		return obj, nil
 	case METHODCALL:
 		chain, args := statementToInvocationChainAndParams(ps.lhs)
 		// It's a method invocation
@@ -208,6 +194,7 @@ func (i *interpreter) evaluateStatement(s statement) (interface{}, error) {
 		} else if err != nil {
 			return nil, err
 		}
+
 		rhs, err := i.evaluateStatement(ps.rhs)
 		if err != nil {
 			return nil, err
