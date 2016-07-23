@@ -186,12 +186,7 @@ func (i *interpreter) evaluateStatement(s statement) (interface{}, error) {
 		// caller, and the actual method, which returns an object and an error, for
 		// the purposes of being able to be called recursively?
 		lhs, err := i.evaluateStatement(ps.lhs)
-		initVar := false
-		if err != nil && strings.Contains(err.Error(), "Unknown variable") {
-			// The left hand side is a variable call, but it hasn't been defined yet
-			// we're setting it for the first time
-			initVar = true
-		} else if err != nil {
+		if err != nil && !strings.Contains(err.Error(), "Unknown variable") {
 			return nil, err
 		}
 
@@ -199,18 +194,8 @@ func (i *interpreter) evaluateStatement(s statement) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		if initVar {
-			// LHS was a variable that didn't exist
-			i.storeInHeap(ps.lhs[0].text, rhs)
-			lhs = rhs
-		} else {
-			// LHS is either an existing variable
-			// or
-			// a property on something else
-			vlhs := reflect.ValueOf(lhs)
-			vlhs.Set(reflect.ValueOf(rhs))
-		}
-
+		i.storeInHeap(ps.lhs[0].text, rhs)
+		lhs = rhs
 		return lhs, nil
 	case INVALID:
 	default:
