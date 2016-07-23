@@ -39,6 +39,7 @@ func newInterpreter() *interpreter {
 
 type statementType int
 
+// These are the list of statementTypes that are currently supported
 const (
 	INVALID      = iota // 0
 	ASSIGNMENT          // 1
@@ -199,7 +200,7 @@ func (i *interpreter) evaluateStatement(s statement) (interface{}, error) {
 		return lhs, nil
 	case INVALID:
 	default:
-		return nil, fmt.Errorf("Error: \"%s\" is not a valid statement", ps.fullStatement)
+		return nil, fmt.Errorf("Error: \"%v\" is not a valid statement", ps.fullStatement)
 	}
 	return nil, nil
 }
